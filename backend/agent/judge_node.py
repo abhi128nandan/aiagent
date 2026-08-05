@@ -21,8 +21,7 @@ logger = get_logger(__name__)
 
 # ── Judge Prompt ────────────────────────────────────────────────────────────
 
-JUDGE_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """You are a senior plan reviewer. Evaluate the project plan against user requirements using these criteria:
+_JUDGE_SYSTEM_BASE = """You are a senior plan reviewer. Evaluate the project plan against user requirements using these criteria:
 
 **CRITERIA** (score each 1-10):
 1. COMPLETENESS: Does the plan list ALL files needed? Every UI component, route, config, and data model?
@@ -41,7 +40,28 @@ JUDGE_PROMPT = ChatPromptTemplate.from_messages([
 - [ ] package.json / requirements.txt lists all needed dependencies (If tech_stack.backend = 'none' and no framework, confirm no npm dependencies needed)
 - [ ] Dev server start command is correct and runs in background
 - [ ] Server binds to 0.0.0.0 (not localhost/127.0.0.1) (Answer YES if no server is needed)
-- [ ] No circular dependency in task execution order
+- [ ] No circular dependency in task execution order"""
+
+_JUDGE_VANILLA_JS_RULES = """
+
+**VANILLA HTML/CSS/JS PROJECT RULES**:
+This project uses plain HTML, CSS, and JavaScript with NO framework and NO backend.
+- `python3 -m http.server` is the CORRECT dev server for serving static HTML files. Do NOT reject the plan for using Python instead of Node.js.
+- NO `package.json` or `requirements.txt` is needed. Answer YES to the dependency checklist item.
+- Score COMPATIBILITY 10/10 if the run command uses `python3 -m http.server` with `--bind 0.0.0.0` and runs in the background (`&`).
+- Score DOCKER/SERVER 10/10 automatically since there is no application server.
+- Do NOT recommend adding Node.js, npm, or any framework files."""
+
+_JUDGE_ABAP_RULES = """
+
+**ABAP REPOS BYPASS & RULES**:
+If the project language or backend is "abap":
+- Bypassing local compilation/execution is the REQUIRED behavior. No dev server, dependencies, or run commands should be specified. Score COMPATIBILITY, FEASIBILITY, and DOCKER/SERVER 10/10 automatically.
+- Do NOT expect Node.js, Python, or standard configuration files (like package.json, requirements.txt, or Vite configurations) unless explicitly requested.
+- COMPLETENESS & FILE_COVERAGE: Ensure the plan specifies the complete 16-stage repository folder structure.
+- Answer YES to checklist items for dev server, dependencies, and bindings if no server/dependencies are needed (which is correct for ABAP)."""
+
+_JUDGE_OUTPUT_FORMAT = """
 
 Output EXACTLY this JSON (no markdown outside):
 {{
@@ -57,10 +77,34 @@ Output EXACTLY this JSON (no markdown outside):
   "checklist_failures": ["list of failed checklist items, if any"],
   "critique": "Specific issues or recommendations. Be concise.",
   "root_cause_analysis": "Identify why any inconsistencies occurred (e.g. why React was generated for vanilla JS)",
-  "agent_responsible": "planner or researcher"
-}}"""),
+  "agent_responsible": "planner or researcher",
+  "additional_todos": [{{"file_path": "path/to/file", "content": "description of missing work", "action": "create"}}]
+}}"""
 
-    ("human", """REQUIREMENTS:
+
+def _build_judge_prompt(tech_stack: dict = None) -> ChatPromptTemplate:
+    """Build a Judge prompt tailored to the project type, reducing token waste."""
+    system_text = _JUDGE_SYSTEM_BASE
+
+    is_vanilla = False
+    is_abap = False
+    if tech_stack and isinstance(tech_stack, dict):
+        lang = tech_stack.get('language', '').lower()
+        frontend = tech_stack.get('frontend', '').lower()
+        backend = tech_stack.get('backend', '').lower()
+        is_abap = lang == 'abap' or backend == 'abap'
+        is_vanilla = frontend == 'html_css_js' and backend == 'none' and not is_abap
+
+    if is_vanilla:
+        system_text += _JUDGE_VANILLA_JS_RULES
+    elif is_abap:
+        system_text += _JUDGE_ABAP_RULES
+
+    system_text += _JUDGE_OUTPUT_FORMAT
+
+    return ChatPromptTemplate.from_messages([
+        ("system", system_text),
+        ("human", """REQUIREMENTS:
 {srs_text}
 
 PROPOSED PLAN:
@@ -72,7 +116,11 @@ SANDBOX ENVIRONMENT:
 {structural_issues}
 
 Evaluate now."""),
-])
+    ])
+
+
+# Default prompt for backward compatibility
+JUDGE_PROMPT = _build_judge_prompt()
 
 
 def _resolve_judge_llm(state: AgentState):
@@ -234,7 +282,7 @@ def structural_plan_check(plan_str: str, tech_stack_override: dict = None) -> di
             )
             
         # Detect React/backend hallucination in Vanilla JS project
-        if frontend == 'html_css_js' or frontend == 'none':
+        if (frontend == 'html_css_js' or frontend == 'none') and language != 'abap':
             for f in files:
                 if isinstance(f, str) and (
                     'package.json' in f or 'vite.config' in f or 
@@ -386,7 +434,7 @@ async def judge_node(state: AgentState) -> AgentState:
         updates = {
             "plan_approved": False,
             "judge_feedback": critique,
-            "judge_attempts": attempts + 1,
+            "judge_attempts": attempts,  # Do not burn a retry on structural failures
             "status": "plan",
             "messages": [AIMessage(content=f"[Judge Evaluation] Approved: False (Structural Issues)\n\n{critique}")],
             "token_count": 0,
@@ -410,7 +458,8 @@ async def judge_node(state: AgentState) -> AgentState:
 
     try:
         llm = _resolve_judge_llm(state)
-        chain = JUDGE_PROMPT | llm
+        judge_prompt = _build_judge_prompt(tech_stack_override)
+        chain = judge_prompt | llm
 
         from agent.observability import ObservabilityCallbackHandler
         handler = ObservabilityCallbackHandler(session_id, "Judge Agent")
@@ -432,6 +481,88 @@ async def judge_node(state: AgentState) -> AgentState:
         checklist_failures = result.get("checklist_failures", [])
         root_cause = result.get("root_cause_analysis", "")
         agent_responsible = result.get("agent_responsible", "")
+
+        # Override scores for special project types
+        is_abap = False
+        is_vanilla_js = False
+        if tech_stack_override and isinstance(tech_stack_override, dict):
+            lang = tech_stack_override.get('language', '').lower()
+            frontend = tech_stack_override.get('frontend', '').lower()
+            backend = tech_stack_override.get('backend', '').lower()
+            is_abap = lang == 'abap' or backend == 'abap'
+            is_vanilla_js = frontend == 'html_css_js' and backend == 'none' and not is_abap
+
+        # Vanilla JS override: force correct scores for python http.server plans
+        if is_vanilla_js:
+            if not isinstance(criteria_scores, dict):
+                criteria_scores = {}
+            criteria_scores['compatibility'] = 10
+            criteria_scores['docker'] = 10
+            # Remove false checklist failures about package.json/Node.js
+            if checklist_failures:
+                checklist_failures = [
+                    f for f in checklist_failures
+                    if 'package.json' not in f.lower()
+                    and 'requirements.txt' not in f.lower()
+                    and 'node' not in f.lower()
+                ]
+            # Recalculate score
+            if criteria_scores:
+                valid_scores = [v for v in criteria_scores.values() if isinstance(v, (int, float))]
+                if valid_scores:
+                    score = round(sum(valid_scores) / len(valid_scores))
+            if score >= 6 and not checklist_failures:
+                approved = True
+
+        if is_abap:
+            if not isinstance(criteria_scores, dict):
+                criteria_scores = {}
+            criteria_scores['compatibility'] = 10
+            criteria_scores['feasibility'] = 10
+            criteria_scores['docker'] = 10
+            
+            # Enforce 16-stage folder completeness at python level
+            plan_files = []
+            try:
+                parsed_plan = _json.loads(plan)
+                plan_files = parsed_plan.get('files', [])
+                if not plan_files:
+                    for step in parsed_plan.get('steps', []):
+                        fpath = step.get('file', '')
+                        if fpath:
+                            plan_files.append(fpath)
+            except Exception:
+                pass
+                
+            required_folders = [
+                'docs/', 'packages/', 'dictionary/', 'classes/', 'reports/',
+                'module_pools/', 'functions/', 'forms/', 'cds_views/', 'odata/',
+                'workflows/', 'auth/'
+            ]
+            missing_folders = []
+            for folder in required_folders:
+                has_file = any(f.startswith(folder) or f.lstrip('/').startswith(folder) for f in plan_files)
+                if not has_file:
+                    missing_folders.append(folder)
+            
+            if missing_folders:
+                approved = False
+                criteria_scores['completeness'] = 4
+                criteria_scores['file_coverage'] = 4
+                score = 4
+                missing_str = ", ".join(missing_folders)
+                critique += f"\n[ABAP Plan is incomplete. The plan MUST contain files in all 16-stage/designated folders. Missing folders: {missing_str}]"
+            else:
+                completeness_score = criteria_scores.get('completeness', 10)
+                file_coverage_score = criteria_scores.get('file_coverage', 10)
+                
+                if completeness_score >= 6 and file_coverage_score >= 6:
+                    approved = True
+                    score = int((completeness_score + file_coverage_score + 30) / 5)
+                else:
+                    approved = False
+                    score = min(completeness_score, file_coverage_score)
+                    critique += "\n[ABAP Plan missing components: Please ensure all 16 stages/folders have files.]"
 
         # Append structural issues to critique if any
         if structural['issues']:
@@ -475,6 +606,31 @@ async def judge_node(state: AgentState) -> AgentState:
 
         new_status = "implement" if approved else "plan"
         
+        # ── Append additional todos discovered by the Judge ─────────────
+        additional_todos = result.get("additional_todos", [])
+        if additional_todos and isinstance(additional_todos, list):
+            try:
+                from agent.todo_manager import TodoManager
+                todo_mgr = TodoManager(session_id)
+                appended = todo_mgr.append_todos(additional_todos)
+                if appended:
+                    logger.info(
+                        "judge_appended_todos",
+                        session_id=session_id,
+                        appended=appended,
+                    )
+                    # Persist immediately if runtime is available
+                    try:
+                        from runtime import DockerRuntime
+                        rt = DockerRuntime.get(session_id)
+                        if rt:
+                            import asyncio
+                            await todo_mgr.save(rt)
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.warning("judge_append_todos_failed", error=str(e))
+
         # ── Task 3.3: Track token metrics ──────────────────────────────
         # Calculate final token count (tokens from SRS + plan)
         final_token_count = count_tokens(srs, model_name) + plan_tokens
@@ -538,3 +694,38 @@ async def judge_node(state: AgentState) -> AgentState:
             'tokens': fallback_token_count,
         })
         return new_state
+
+
+async def judge_structural_check(state: AgentState) -> AgentState:
+    """
+    Two-tier verification gate: structural sub-node before semantic judge evaluation.
+    Validates the plan output against expected schema and structural constraints without calling LLM.
+    Does NOT increment judge_attempts on failure.
+    """
+    from agent.state_manager import merge_state_updates
+    plan = state.get("plan", "{}")
+    tech_stack_override = state.get("tech_stack")
+    
+    # Try Pydantic / JSON structural verification
+    structural = structural_plan_check(plan, tech_stack_override=tech_stack_override)
+    if structural["auto_reject"]:
+        critique = "Plan auto-rejected by structural validation:\n" + "\n".join(
+            f"- {issue}" for issue in structural['issues']
+        )
+        logger.warning(
+            "judge_structural_check_reject",
+            session_id=state.get("session_id", ""),
+            issues=structural['issues'],
+        )
+        updates = {
+            "judge_structural_ok": False,
+            "plan_approved": False,
+            "judge_feedback": critique,
+            # Notice we do NOT increment judge_attempts so structural failures don't burn planning loop retries!
+        }
+    else:
+        updates = {
+            "judge_structural_ok": True
+        }
+    return merge_state_updates(state, updates)
+

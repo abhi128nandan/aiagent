@@ -50,7 +50,7 @@ CRITICAL RULES:
   - Port in use? Kill it first: 'npx -y kill-port PORT'
   - IMAGE PATHS: Use public URLs (Unsplash, Picsum) or inline SVGs. No local images.
   - DOM: Always null-check elements before addEventListener.
-  - ABAP: Transpile with @abaplint, use MemoryConsole + cache-buster import.
+  - ABAP: Generate source code ONLY. Do not compile, preview, or validate. Use <write> to generate all architecture folders (docs, packages, dictionary, etc.) and files. Do NOT use <run>.
   - Only <finish> when ALL files written, deps installed, app running.
 """
 
@@ -84,15 +84,18 @@ steps yet — those will be added in a detail planning phase after scaffolding.
 }}
 
 RULES for environment detection:
-- "runtime" should be an array of required runtimes (e.g. ["node"], ["python3"], ["node", "python3"]). Do NOT blindly output ["node", "python3", "java"].
+- **HTML/CSS/JS ONLY projects**: If the project uses ONLY plain HTML, CSS, and JavaScript (no React/Vue/Angular/Next.js), set runtime to ["python3"], use "python3 -m http.server 3000 --bind 0.0.0.0 > app.log 2>&1 &" as run_command, and set template_selected to "none". Do NOT set runtime to ["node"] for plain HTML/CSS/JS projects.
 - If the project uses React/Vue/Angular/Next.js, runtime MUST include "node"
 - If the project uses Python (Flask/FastAPI/Django), runtime MUST include "python3"
 - If the project uses Java (Spring Boot), runtime MUST include "java"
-- If the project is simple HTML/CSS/JS only, runtime is ["python3"], use python http.server, and set template_selected to "none"
+- "runtime" should be an array of required runtimes. Do NOT blindly output ["node", "python3", "java"].
 - If the project needs a database, include the database client in system_packages
 - "global_tools" are npm packages to install globally (e.g., "create-react-app", "vite")
 - Provide the exact 'template_selected' matching the requested framework. The backend will copy the template files automatically.
+- "template_selected" MUST be exactly one of: "react-vite", "express", "vue", "angular", "nextjs", "fastapi", "flask", "django", "spring_boot", or "none". Do NOT invent other names like "react-vite-ts".
 - If this is an EXISTING project (workspace context shows existing files), set template_selected to "none" — do NOT re-scaffold.
+- If the language is ABAP, set template_selected to "none" and run_command to "" (empty string). Do NOT scaffold.
+- For FULLSTACK projects (where both frontend != "none" and backend != "none", e.g., React + FastAPI): "run_command" MUST start BOTH services from root. DO NOT include "cd backend", "pip install", or "npm install" inside run_command (dependencies are installed automatically during setup). Example for React + FastAPI: "python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 > backend.log 2>&1 & npm run dev -- --host 0.0.0.0 > app.log 2>&1 &"
 - Keep `steps` as an empty array [] — file-level steps are generated in the detail phase.
 """
 
@@ -124,15 +127,8 @@ Output ONLY a valid JSON object with this structure:
     "global_tools": []
   }},
   "template_selected": "none",
-  "run_command": "python3 -m http.server 3000 -d src > app.log 2>&1 &",
-  "api_contract": [
-    {{
-      "route": "/api/products",
-      "method": "GET",
-      "description": "Fetch all products",
-      "response_schema": {{ "type": "array", "items": {{ "id": "string", "name": "string" }} }}
-    }}
-  ],
+  "run_command": "python3 -m http.server 3000 --bind 0.0.0.0 > app.log 2>&1 &",
+  "api_contract": [],
   "steps": [
     {{
       "file": "index.html",
@@ -143,10 +139,28 @@ Output ONLY a valid JSON object with this structure:
 }}
 
 CRITICAL RULES:
-1. **API CONTRACT**: Only output `api_contract` if `tech_stack.backend` != 'none'. Skip it entirely for standalone frontend projects.
+1. **API CONTRACT**: Only output `api_contract` if `tech_stack.backend` != 'none'. Skip it entirely for standalone frontend projects. Each endpoint object in `api_contract` should contain `"endpoint"`, `"method"`, and `"description"`.
 2. **USE EXACT FILE PATHS** from the workspace context.
 3. Include steps for EVERY file that needs to be created or modified.
-4. Preserve EXACTLY the project, description, tech_stack, environment, template_selected, and run_command fields from the original bootstrap plan.
+4. Preserve the project architecture, tech_stack, environment, template_selected, and run_command from the bootstrap plan UNLESS explicitly instructed to correct them by the judge critique.
+5. **STEPS SCHEMA**: In the `steps` array, each object MUST strictly contain ONLY three keys: `"file"`, `"action"`, and `"description"`. DO NOT generate any extra fields such as `"content"`, `"code"`, or `"diff"`. Do NOT write implementation code or code blocks inside the plan. Do NOT use backticks (`) under any circumstances in the JSON.
+"""
+
+# ABAP-specific instructions appended only when language is 'abap'
+ABAP_REFINE_INSTRUCTIONS = """
+6. **ABAP Repositories**: If the language is `abap`, you MUST generate a complete 16-stage enterprise repository structure. Do NOT generate standard MVC web folders (like `src/`, `components/`, `routes/`, or `package.json`). Instead, plan files in all of the following designated folders:
+   - `docs/` (e.g., `docs/requirement_analysis.md`, `docs/architecture.md`, `docs/technical_documentation.md`)
+   - `packages/` (e.g., `packages/zcore/`, `packages/zcalculator/`)
+   - `dictionary/` (e.g., `dictionary/ztable.tabl.xml` for database tables, domains, data elements)
+   - `classes/` (e.g., `classes/zcl_calculator.clas.abap`, `classes/zif_calculator.intf.abap` for classes and interfaces)
+   - `reports/` (e.g., `reports/zcalculator_prog.prog.abap` for reports/executable programs)
+   - `module_pools/` (e.g., `module_pools/zcalculator_mp.prog.abap` for dialog programs)
+   - `functions/` (e.g., `functions/zfm_calculator.fugr.abap` for function modules)
+   - `forms/` (e.g., `forms/zsmartform.sf.xml`, `forms/zadobeform.pdf.xml` for Smart Forms and Adobe Forms)
+   - `cds_views/` (e.g., `cds_views/zddls_calculator.ddls.asddls` for Core Data Services views)
+   - `odata/` (e.g., `odata/zcalculator_srv.xml` for OData service definitions)
+   - `workflows/` (e.g., `workflows/zcalculator_wf.xml` for SAP Business Workflows)
+   - `auth/` (e.g., `auth/zcalculator_auth.auth.xml` for authorization objects)
 """
 
 PLANNER_SYSTEM_PROMPT = """You are the bootstrap planner in a multi-agent code generation pipeline.
@@ -166,7 +180,14 @@ CRITICAL RULES:
 2. **API Contract**: Only output `api_contract` if `tech_stack.backend` != 'none'.
 3. **Enforce Architecture**: Review the provided ARCHITECTURAL PLAN. Organize new files into scalable structures (if using a framework). For Vanilla JS, keep it flat (no `src/components`, `src/services`, etc. unless necessary).
 4. **Use Real File Paths**: Use exact paths from the workspace context.
-5. **Output Format**: Your entire response must be parseable by JSON.parse() with no modification. Do NOT output markdown code blocks (e.g. ```json). If your output starts with ``` or ends with ``` it will cause a parser crash. Never include these characters."""
+5. **Output Format**: Your entire response must be parseable by JSON.parse() with no modification. Do NOT output markdown code blocks (e.g. ```json). If your output starts with ``` or ends with ``` it will cause a parser crash. Never include these characters.
+6. **Separate Dependencies**: DO NOT list backend Python dependencies (FastAPI, Uvicorn, SQLite) in package.json steps. Keep frontend (package.json) and backend (backend/requirements.txt) steps separated.
+"""
+
+# ABAP-specific system instructions appended only when language is 'abap'
+ABAP_SYSTEM_INSTRUCTIONS = """
+6. **ABAP Repositories**: If the language is `abap`, you MUST generate the complete 16-stage enterprise repository structure. Do NOT generate standard MVC web folders (like `src/`, `components/`, `routes/`, or `package.json`). Instead, map out files in the designated folders: `docs/`, `packages/`, `dictionary/`, `classes/`, `reports/`, `module_pools/`, `functions/`, `forms/`, `cds_views/`, `odata/`, `workflows/`, and `auth/`. Include files for all folders to ensure completeness.
+"""
 
 # ── Bootstrap Plan Prompt ──────────────────────────────────────────────────
 plan_bootstrap_prompt = ChatPromptTemplate.from_messages([
@@ -205,8 +226,8 @@ Continue implementing. Output ALL necessary action tags.
 WORKFLOW:
 1. The scaffolding has ALREADY been done. The workspace contains scaffolded files. READ the existing file contents in workspace context.
 2. Use <replace> to modify existing scaffolded files per the plan steps. Use <write> ONLY for brand new files.
-3. After all files are modified, install any additional dependencies with <run>, then start the dev server.
-4. Only use <finish> when ALL plan steps are done, deps installed, and app is running.
+3. After all files are modified, install any additional dependencies with <run>, then start the dev server. (NOTE: IF language is ABAP, SKIP this step entirely. Do NOT emit <run> tags).
+4. Only use <finish> when ALL plan steps are done, deps installed, and app is running (For ABAP, use <finish> immediately after writing all files).
 Use <search>query</search> if you need to look something up.'''),
 ])
 

@@ -30,6 +30,17 @@ class MemoryEntry(BaseModel):
     decisions: List[str] = Field(default_factory=list)
 
 
+class FixRecord(BaseModel):
+    """A record of a code fix attempt, its parameters, and validation outcome."""
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+    file: str
+    issue_category: str
+    issue_message: str
+    fix_diff: str
+    success: bool
+    error_message: Optional[str] = None
+
+
 class WorkingMemory(BaseModel):
     """Current task context — what the agent is actively working on."""
     current_plan: str = ""
@@ -49,13 +60,16 @@ class MemoryManager:
       1. Short-term: LangGraph message history (managed by ContextManager)
       2. Long-term: Compressed summaries stored as MemoryEntry objects
       3. Working: Current task state (plan, files, etc.)
+      4. Fix History: Successful and failed fixes for learning
     """
 
     MAX_LONG_TERM_ENTRIES = 50
+    MAX_FIX_RECORDS = 100
 
     def __init__(self) -> None:
         self.long_term: List[MemoryEntry] = []
         self.working = WorkingMemory()
+        self.fix_history: List[FixRecord] = []
 
     def compress_interactions(self, messages_text: List[str]) -> MemoryEntry:
         """
@@ -243,10 +257,57 @@ class MemoryManager:
             parts.append(f"Key decisions: {'; '.join(decisions[:3])}")
         return " | ".join(parts) if parts else "General progress."
 
+    def record_fix(
+        self,
+        file: str,
+        issue_category: str,
+        issue_message: str,
+        fix_diff: str,
+        success: bool,
+        error_message: Optional[str] = None,
+    ) -> None:
+        """Record a fix attempt in the project memory."""
+        record = FixRecord(
+            file=file,
+            issue_category=issue_category,
+            issue_message=issue_message,
+            fix_diff=fix_diff,
+            success=success,
+            error_message=error_message,
+        )
+        self.fix_history.append(record)
+
+        # Cap fix history to prevent memory bloat
+        if len(self.fix_history) > self.MAX_FIX_RECORDS:
+            self.fix_history = self.fix_history[-self.MAX_FIX_RECORDS:]
+
+        logger.info(
+            "fix_recorded",
+            file=file,
+            category=issue_category,
+            success=success,
+            total_records=len(self.fix_history),
+        )
+
+    def get_similar_fixes(self, issue_category: str, file_path: str) -> List[FixRecord]:
+        """Retrieve past successful fixes for a similar issue category."""
+        return [
+            rec for rec in self.fix_history
+            if rec.success and rec.issue_category == issue_category
+        ]
+
+    def get_known_failures(self, issue_category: str, file_path: str) -> List[FixRecord]:
+        """Retrieve past FAILED attempts for a similar issue category to avoid repeating them."""
+        return [
+            rec for rec in self.fix_history
+            if not rec.success and rec.issue_category == issue_category
+        ]
+
     def to_dict(self) -> dict:
         """Serialize memory state for debugging / persistence."""
         return {
             "long_term_count": len(self.long_term),
             "working_memory": self.working.model_dump(),
             "long_term_entries": [e.model_dump() for e in self.long_term[-5:]],
+            "fix_history": [r.model_dump() for r in self.fix_history[-20:]],
         }

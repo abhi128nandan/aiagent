@@ -116,12 +116,16 @@ async def test_architecture_node_wrapped_success(mock_arch):
     
     # Setup mock architecture plan
     state = create_initial_state("session-123")
+    valid_graph = {
+        "nodes": [{"id": "A", "data": {"label": "Node A"}}, {"id": "B", "data": {"label": "Node B"}}],
+        "edges": [{"id": "e1", "source": "A", "target": "B"}]
+    }
     artifacts = ArchitecturalArtifacts(
-        system_diagram="graph TD\n    A --> B",
-        component_diagram="graph TD\n    A --> B",
-        data_flow_diagram="graph TD\n    A --> B",
-        sequence_diagrams=["sequenceDiagram\n    A->>B: msg"],
-        deployment_diagram="graph TD\n    A --> B"
+        system_diagram=valid_graph,
+        component_diagram=valid_graph,
+        data_flow_diagram=valid_graph,
+        sequence_diagrams=[valid_graph],
+        deployment_diagram=valid_graph
     )
     adr = ADRManager.generate_tech_stack_adr({"frontend": "React"})
     plan = ArchitecturalPlan(
@@ -157,5 +161,18 @@ async def test_architecture_node_wrapped_fail(mock_arch):
     # Check status and verification status
     assert final_state["stage_checkpoints"]["architecture"].verification_status == "Fail"
     assert final_state["status"] == "error" # Critical failure immediately escalates to error
+
+
+@pytest.mark.anyio
+@patch("agent.graph.plan_bootstrap_node", new_callable=AsyncMock)
+async def test_bootstrap_node_clears_node_exception(mock_plan):
+    state = create_initial_state("session-123")
+    state["node_exception"] = {"type": "TemplateNotFoundError", "message": "Test error"}
+    state["plan"] = '{"project": "test", "description": "desc", "tech_stack": {"frontend": "react", "backend": "none", "database": "none", "language": "typescript"}, "environment": {"runtime": ["node"]}, "template_selected": "react-vite", "run_command": "npm run dev", "steps": []}'
+    
+    mock_plan.return_value = state.copy()
+    
+    final_state = await plan_bootstrap_node_wrapped(state)
+    assert "node_exception" not in final_state
 
 

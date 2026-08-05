@@ -1,33 +1,45 @@
-from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional, Literal
+from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import List, Optional, Literal, Dict, Any
 import re
-from agent.mermaid_validator import is_valid_mermaid
+
+class ReactFlowGraph(BaseModel):
+    nodes: List[Dict[str, Any]] = Field(
+        ..., 
+        description="List of React Flow nodes. Each must have 'id' (str) and 'data' (dict) with at least a 'label' string."
+    )
+    edges: List[Dict[str, Any]] = Field(
+        ..., 
+        description="List of React Flow edges. Each must have 'id', 'source', and 'target' (all str) matching node ids."
+    )
+
+    @model_validator(mode='after')
+    def validate_graph(self):
+        node_ids = set()
+        for node in self.nodes:
+            if 'id' not in node or not isinstance(node['id'], str):
+                raise ValueError(f"Node missing string 'id': {node}")
+            if 'data' not in node or not isinstance(node['data'], dict):
+                raise ValueError(f"Node missing dictionary 'data': {node}")
+            node_ids.add(node['id'])
+
+        for edge in self.edges:
+            if 'id' not in edge or not isinstance(edge['id'], str):
+                raise ValueError(f"Edge missing string 'id': {edge}")
+            if 'source' not in edge or 'target' not in edge:
+                raise ValueError(f"Edge missing 'source' or 'target': {edge}")
+            if edge['source'] not in node_ids:
+                raise ValueError(f"Edge source '{edge['source']}' does not match any node id")
+            if edge['target'] not in node_ids:
+                raise ValueError(f"Edge target '{edge['target']}' does not match any node id")
+        return self
+
 
 class ArchitecturalArtifacts(BaseModel):
-    system_diagram: str = Field(..., description="Mermaid diagram of system components")
-    component_diagram: str = Field(..., description="Component interaction diagram")
-    data_flow_diagram: str = Field(..., description="Data flow through system")
-    sequence_diagrams: List[str] = Field(default_factory=list, description="Key interaction sequences")
-    deployment_diagram: str = Field(..., description="Runtime deployment architecture")
-
-    @field_validator("system_diagram", "component_diagram", "data_flow_diagram", "deployment_diagram")
-    @classmethod
-    def validate_diagram_syntax(cls, v: str) -> str:
-        valid, err = is_valid_mermaid(v)
-        if not valid:
-            raise ValueError(f"Invalid Mermaid diagram syntax: {err}")
-        return v
-
-    @field_validator("sequence_diagrams")
-    @classmethod
-    def validate_sequences(cls, v: List[str]) -> List[str]:
-        if not v or len(v) < 1:
-            raise ValueError("sequence_diagrams must contain at least 1 diagram")
-        for idx, diagram in enumerate(v):
-            valid, err = is_valid_mermaid(diagram)
-            if not valid:
-                raise ValueError(f"Sequence diagram at index {idx} has invalid Mermaid syntax: {err}")
-        return v
+    system_diagram: ReactFlowGraph = Field(..., description="High-level container graph")
+    component_diagram: ReactFlowGraph = Field(..., description="Component interaction graph")
+    data_flow_diagram: ReactFlowGraph = Field(..., description="Data flow graph")
+    sequence_diagrams: List[ReactFlowGraph] = Field(default_factory=list, description="Sequence represented as flowchart")
+    deployment_diagram: ReactFlowGraph = Field(..., description="Runtime deployment architecture")
 
 
 class ArchitectureDecisionRecord(BaseModel):

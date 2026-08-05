@@ -38,6 +38,32 @@ async def lifespan(app: FastAPI):
         )
     )
     
+    # --- Startup Check: Verify Templates Exist ---
+    import os
+    backend_dir = os.path.dirname(os.path.abspath(__file__))
+    templates_dir = os.path.join(backend_dir, "templates")
+    
+    # We parse agent.prompts to extract the EXACT enum of templates we told the LLM to use
+    from agent.prompts import BOOTSTRAP_PLAN_SCHEMA_INSTRUCTIONS
+    from agent.nodes import DYNAMIC_SCAFFOLD_TEMPLATES
+    import re
+    # Look for the line: - "template_selected" MUST be exactly one of: ...
+    match = re.search(r'"template_selected" MUST be exactly one of:\s*(.*?)\.', BOOTSTRAP_PLAN_SCHEMA_INSTRUCTIONS)
+    if match:
+        enum_str = match.group(1)
+        # Extract quoted strings
+        expected_templates = [t.strip('"\'') for t in re.findall(r'["\']([^"\']+)["\']', enum_str)]
+        static_templates = [t for t in expected_templates if t.lower() != "none" and t not in DYNAMIC_SCAFFOLD_TEMPLATES]
+        
+        for template in static_templates:
+            template_path = os.path.join(templates_dir, template)
+            if not os.path.isdir(template_path):
+                raise RuntimeError(f"Startup check failed: Template directory '{template}' enumerated in prompt does not exist at {template_path}")
+        logger.info("startup_check_passed", static_templates_verified=static_templates, dynamic_templates=list(DYNAMIC_SCAFFOLD_TEMPLATES.keys()))
+    else:
+        logger.warning("startup_check_warning", msg="Could not parse template enum from BOOTSTRAP_PLAN_SCHEMA_INSTRUCTIONS")
+    # ---------------------------------------------
+    
     yield
     
     # Cleanup

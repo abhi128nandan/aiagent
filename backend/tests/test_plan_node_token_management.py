@@ -38,15 +38,18 @@ async def test_plan_bootstrap_includes_token_metrics():
 
     mock_llm, _ = _mock_llm_factory_response(
         '{"project": "todo", "description": "Simple todo app", '
-        '"tech_stack": {"frontend": "react"}, "scaffold_command": "", '
-        '"run_command": "npm run dev", "steps": []}'
+        '"tech_stack": {"frontend": "react", "backend": "none", "database": "none", "language": "typescript"}, '
+        '"environment": {"runtime": ["node"], "system_packages": [], "global_tools": []}, '
+        '"template_selected": "react-vite", "run_command": "npm run dev", "steps": []}'
     )
 
     with patch('agent.nodes._resolve_llm', return_value=mock_llm), \
+         patch('agent.nodes._get_model_name') as mock_model_name_getter, \
          patch('agent.nodes.WorkspaceIndexer') as mock_indexer, \
          patch('agent.nodes.DockerRuntime'), \
          patch('agent.nodes._get_memory_manager'), \
          patch('agent.observability.ObservabilityManager'):
+        mock_model_name_getter.side_effect = lambda state, role=None: state.get("llm_profile", {}).get("model", "")
         mock_indexer.return_value.get_ranked_context.return_value = "No existing workspace"
         result_state = await plan_bootstrap_node(mock_state)
 
@@ -77,14 +80,21 @@ async def test_plan_bootstrap_fits_whole_request():
         'chat_mode': 'build'
     }
 
-    mock_llm, _ = _mock_llm_factory_response('{"project": "test", "steps": []}')
+    mock_llm, _ = _mock_llm_factory_response(
+        '{"project": "test", "description": "Large SRS test", '
+        '"tech_stack": {"frontend": "react", "backend": "none", "database": "none", "language": "typescript"}, '
+        '"environment": {"runtime": ["node"], "system_packages": [], "global_tools": []}, '
+        '"template_selected": "react-vite", "run_command": "npm run dev", "steps": []}'
+    )
 
     with patch('agent.nodes._resolve_llm', return_value=mock_llm), \
+         patch('agent.nodes._get_model_name') as mock_model_name_getter, \
          patch('agent.nodes.ContextManager') as mock_ctx_manager_class, \
          patch('agent.nodes.WorkspaceIndexer'), \
          patch('agent.nodes.DockerRuntime'), \
          patch('agent.nodes._get_memory_manager'), \
          patch('agent.observability.ObservabilityManager'):
+        mock_model_name_getter.side_effect = lambda state, role=None: state.get("llm_profile", {}).get("model", "")
 
         mock_ctx_manager = MagicMock()
         # fit_request must return prompt-ready components for the template

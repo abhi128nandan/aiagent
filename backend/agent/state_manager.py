@@ -165,7 +165,8 @@ def validate_state(state: Dict[str, Any]) -> tuple[bool, list[str]]:
     return (len(errors) == 0, errors)
 
 
-def merge_state_updates(current_state: Dict[str, Any], updates: Dict[str, Any]) -> Dict[str, Any]:
+from typing import cast
+def merge_state_updates(current_state: AgentState, updates: Dict[str, Any]) -> AgentState:
     """
     Safely merge state updates into current state
     
@@ -208,7 +209,7 @@ def merge_state_updates(current_state: Dict[str, Any], updates: Dict[str, Any]) 
         else:
             merged[key] = value
     
-    return merged
+    return cast(AgentState, merged)
 
 
 def sanitize_state_for_storage(state: Dict[str, Any]) -> Dict[str, Any]:
