@@ -102,16 +102,29 @@ class WriteFileRequest(PydanticBaseModel):
 # ── Helpers ─────────────────────────────────────────────────────────────
 
 def serialize_data(data):
-    """Recursively serialize Pydantic models and LangChain messages for JSON."""
+    """Recursively serialize Pydantic models, Exceptions, and LangChain messages for JSON."""
     if isinstance(data, PydanticBaseModel):
-        return data.model_dump()
+        return serialize_data(data.model_dump())
     if isinstance(data, dict):
-        return {k: serialize_data(v) for k, v in data.items()}
-    if isinstance(data, (list, tuple)):
+        return {str(k): serialize_data(v) for k, v in data.items()}
+    if isinstance(data, (list, tuple, set)):
         return [serialize_data(v) for v in data]
+    if isinstance(data, Exception):
+        return {"error": data.__class__.__name__, "message": str(data)}
+    
     # Handle LangChain messages gracefully
-    if hasattr(data, 'content') and hasattr(data, 'type'):
-        return {'type': data.type, 'content': data.content}
+    if hasattr(data, 'content') and hasattr(data, 'type') and not isinstance(data, type):
+        return {'type': getattr(data, 'type', type(data).__name__), 'content': serialize_data(getattr(data, 'content', str(data)))}
+    
+    # Safe fallback for non-primitive types
+    if data is not None and not isinstance(data, (str, int, float, bool)):
+        import json
+        try:
+            json.dumps(data)
+            return data
+        except (TypeError, ValueError):
+            return str(data)
+            
     return data
 
 
@@ -231,8 +244,7 @@ async def websocket_endpoint(ws: WebSocket):
                     try:
                         from runtime import DockerRuntime
                         rt = DockerRuntime.get(session_id)
-                        if rt:
-                            await rt.kill_process(pid, sig)
+                        await rt.kill_process(pid, sig)
                     except Exception as e:
                         logger.warning("ws_kill_process_failed", session_id=session_id, pid=pid, error=str(e))
             elif msg_type == "restart_command":
@@ -240,8 +252,7 @@ async def websocket_endpoint(ws: WebSocket):
                     try:
                         from runtime import DockerRuntime
                         rt = DockerRuntime.get(session_id)
-                        if rt:
-                            rt.should_restart_current = True
+                        rt.should_restart_current = True
                     except Exception as e:
                         logger.warning("ws_restart_command_failed", session_id=session_id, error=str(e))
             elif msg_type == "pause_agent":
@@ -266,19 +277,18 @@ async def websocket_endpoint(ws: WebSocket):
                 await asyncio.sleep(2)
                 if session_id != "unknown":
                     rt = DockerRuntime.get(session_id)
-                    if rt:
-                        processes = await rt.get_active_processes()
-                        fg_proc = rt.get_foreground_process(processes)
-                        try:
-                            await ws.send_json({
-                                "type": "process_list",
-                                "processes": processes,
-                                "foreground_process": fg_proc,
-                                "session_id": session_id
-                            })
-                        except (RuntimeError, WebSocketDisconnect) as e:
-                            logger.debug("process_monitor_send_failed", session_id=session_id, error=str(e))
-                            break
+                    processes = await rt.get_active_processes()
+                    fg_proc = rt.get_foreground_process(processes)
+                    try:
+                        await ws.send_json({
+                            "type": "process_list",
+                            "processes": processes,
+                            "foreground_process": fg_proc,
+                            "session_id": session_id
+                        })
+                    except (RuntimeError, WebSocketDisconnect) as e:
+                        logger.debug("process_monitor_send_failed", session_id=session_id, error=str(e))
+                        break
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -307,7 +317,7 @@ async def websocket_endpoint(ws: WebSocket):
     obs_ws_callback = None
     try:
         data = await ws.receive_json()
-        session_id = data.get("session_id", str(uuid.uuid4()))
+        session_id = data.get("session_id") or str(uuid.uuid4())
         action = data.get("action", "start")
         message = data.get("message", "")
         profile_id = data.get("profile_id")
@@ -319,8 +329,9 @@ async def websocket_endpoint(ws: WebSocket):
         from agent.observability import register_broadcaster
         async def obs_ws_callback(payload: dict):
             try:
-                seq = await EVENT_BUFFER.add(session_id, payload)
-                await ws.send_json({**payload, "seq": seq})
+                safe_payload = serialize_data(payload)
+                seq = await EVENT_BUFFER.add(session_id, safe_payload)
+                await ws.send_json({**safe_payload, "seq": seq})
             except Exception as e:
                 logger.debug("obs_ws_broadcast_failed", error=str(e))
                 
@@ -358,19 +369,36 @@ async def websocket_endpoint(ws: WebSocket):
         for event in replay_events:
             await ws.send_json({**event, "replay": True})
 
+        # Fetch existing state values to check status
+        current_state = await graph.aget_state(config)
+        current_values = current_state.values if current_state else {}
+        checkpoint_status = current_values.get("status")
+
         if action == "resume":
             state = {
+                "session_id": session_id,
                 "llm_profile": profile.model_dump() if profile else None,
                 "chat_mode": chat_mode,
                 "locked_files": locked_files,
             }
+            # Append new message if provided on resume
+            if message:
+                existing_messages = list(current_values.get("messages") or [])
+                existing_messages.append(HumanMessage(content=message))
+                state["messages"] = existing_messages
+                
+            # If the session was in error, reset it to allow recovery
+            if checkpoint_status == "error":
+                state["status"] = "plan"
+                state["node_exception"] = None
+                state["plan_error"] = None
         else:
             state = {
+                "session_id": session_id,
                 "messages": [HumanMessage(content=message)] if message else [],
                 "retries": 0,
                 "files": {},
                 "last_obs": None,
-                "session_id": session_id,
                 "llm_profile": profile.model_dump() if profile else None,
                 "chat_mode": chat_mode,
                 "locked_files": locked_files,
@@ -438,7 +466,18 @@ async def websocket_endpoint(ws: WebSocket):
                 raise
 
         graph_task = asyncio.create_task(run_graph())
-        await graph_task
+        
+        done, pending = await asyncio.wait(
+            [receive_task, graph_task],
+            return_when=asyncio.FIRST_COMPLETED
+        )
+        
+        if graph_task in done:
+            exc = graph_task.exception()
+            if exc:
+                raise exc
+            # Graph finished normally, keep connection open until client disconnects
+            await receive_task
 
     except WebSocketDisconnect:
         logger.info("ws_disconnected", session_id=session_id)
@@ -946,6 +985,75 @@ async def restore_file_version(session_id: str, request: FileRestoreRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class AnalyzeProjectRequest(PydanticBaseModel):
+    workspace_path: str = "/workspace"
+
+
+@router.post("/analyze")
+async def analyze_project(request: AnalyzeProjectRequest):
+    """
+    Trigger an autonomous code improvement run on the specified workspace.
+
+    Runs the scan -> build kg -> analyze -> prioritize -> plan -> generate fixes ->
+    review -> apply -> learn loop.
+    """
+    session_id = str(uuid.uuid4())
+    logger.info("api_analyze_project_triggered", session_id=session_id, path=request.workspace_path)
+
+    try:
+        from agent.analyze_graph import build_analyze_graph
+        graph = build_analyze_graph()
+
+        initial_state = {
+            "session_id": session_id,
+            "status": "scanning",
+            "workspace_path": request.workspace_path,
+            "workspace_index": None,
+            "knowledge_graph": None,
+            "issues": [],
+            "plan": None,
+            "changes": [],
+            "applied_changes": [],
+            "errors": [],
+            "retries": 0,
+            "memory": {},
+        }
+
+        # Run graph to completion
+        final_state = await graph.ainvoke(initial_state)
+
+        # Filter out heavy contents (like full file content) before returning to keep payload clean
+        clean_changes = []
+        for change in final_state.get("changes", []):
+            clean_changes.append({
+                "file": change["file"],
+                "change_type": change["change_type"],
+                "diff_summary": change["diff_summary"],
+                "validation_passed": change.get("validation_passed", False),
+                "reviewed_approved": change.get("reviewed_approved", False),
+            })
+
+        return {
+            "session_id": session_id,
+            "status": final_state.get("status"),
+            "issues": final_state.get("issues", []),
+            "plan": final_state.get("plan"),
+            "changes": clean_changes,
+            "applied_changes": [
+                {
+                    "file": c["file"],
+                    "diff_summary": c["diff_summary"],
+                }
+                for c in final_state.get("applied_changes", [])
+            ],
+            "errors": final_state.get("errors", []),
+        }
+    except Exception as e:
+        logger.error("api_analyze_project_failed", session_id=session_id, error=str(e))
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
 
 
 

@@ -4,62 +4,48 @@ from agent.architectural_artifacts import ArchitecturalArtifacts, ArchitectureDe
 from agent.stage_checkpoint import StageCheckpoint, VerificationResult, VerificationMode
 from datetime import datetime
 
-# Sample valid diagrams for testing
-VALID_SYSTEM_DIAGRAM = """graph TD
-    A[User] --> B[Web App]
-"""
+# Sample valid ReactFlowGraph for testing
+VALID_GRAPH = {
+    "nodes": [{"id": "A", "data": {"label": "Node A"}}, {"id": "B", "data": {"label": "Node B"}}],
+    "edges": [{"id": "e1", "source": "A", "target": "B"}]
+}
 
-VALID_COMPONENT_DIAGRAM = """flowchart LR
-    A[API Gateway] --> B[Auth Service]
-"""
-
-VALID_DATA_FLOW_DIAGRAM = """graph LR
-    A[(Database)] --> B[Data Processor]
-"""
-
-VALID_SEQUENCE_DIAGRAM = """sequenceDiagram
-    User->>System: login()
-    System-->>User: token
-"""
-
-VALID_DEPLOYMENT_DIAGRAM = """graph TB
-    subgraph Cloud
-        Server
-    end
-"""
+INVALID_GRAPH = {
+    "nodes": [{"id": 123, "data": {"label": "Node A"}}],  # id must be string
+    "edges": []
+}
 
 def test_architectural_artifacts_valid():
     artifacts = ArchitecturalArtifacts(
-        system_diagram=VALID_SYSTEM_DIAGRAM,
-        component_diagram=VALID_COMPONENT_DIAGRAM,
-        data_flow_diagram=VALID_DATA_FLOW_DIAGRAM,
-        sequence_diagrams=[VALID_SEQUENCE_DIAGRAM],
-        deployment_diagram=VALID_DEPLOYMENT_DIAGRAM
+        system_diagram=VALID_GRAPH,
+        component_diagram=VALID_GRAPH,
+        data_flow_diagram=VALID_GRAPH,
+        sequence_diagrams=[VALID_GRAPH],
+        deployment_diagram=VALID_GRAPH
     )
-    assert artifacts.system_diagram == VALID_SYSTEM_DIAGRAM
+    assert len(artifacts.system_diagram.nodes) == 2
     assert len(artifacts.sequence_diagrams) == 1
 
-def test_architectural_artifacts_invalid_mermaid():
+def test_architectural_artifacts_invalid_graph():
     with pytest.raises(ValidationError) as excinfo:
         ArchitecturalArtifacts(
-            system_diagram="invalid diagram content here",
-            component_diagram=VALID_COMPONENT_DIAGRAM,
-            data_flow_diagram=VALID_DATA_FLOW_DIAGRAM,
-            sequence_diagrams=[VALID_SEQUENCE_DIAGRAM],
-            deployment_diagram=VALID_DEPLOYMENT_DIAGRAM
+            system_diagram=INVALID_GRAPH,
+            component_diagram=VALID_GRAPH,
+            data_flow_diagram=VALID_GRAPH,
+            sequence_diagrams=[VALID_GRAPH],
+            deployment_diagram=VALID_GRAPH
         )
-    assert "Invalid Mermaid diagram syntax" in str(excinfo.value)
+    assert "validation error" in str(excinfo.value).lower()
 
-def test_architectural_artifacts_empty_sequences():
-    with pytest.raises(ValidationError) as excinfo:
-        ArchitecturalArtifacts(
-            system_diagram=VALID_SYSTEM_DIAGRAM,
-            component_diagram=VALID_COMPONENT_DIAGRAM,
-            data_flow_diagram=VALID_DATA_FLOW_DIAGRAM,
-            sequence_diagrams=[],
-            deployment_diagram=VALID_DEPLOYMENT_DIAGRAM
-        )
-    assert "sequence_diagrams must contain at least 1 diagram" in str(excinfo.value)
+def test_architectural_artifacts_empty_sequences_allowed():
+    artifacts = ArchitecturalArtifacts(
+        system_diagram=VALID_GRAPH,
+        component_diagram=VALID_GRAPH,
+        data_flow_diagram=VALID_GRAPH,
+        sequence_diagrams=[],
+        deployment_diagram=VALID_GRAPH
+    )
+    assert len(artifacts.sequence_diagrams) == 0
 
 def test_adr_valid():
     adr = ArchitectureDecisionRecord(

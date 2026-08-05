@@ -178,11 +178,14 @@ class LLMFactory:
             mode="pool" if len(keys) > 1 else "single",
         )
 
-        return RateLimitedGroqLLM(
+        groq_llm = RateLimitedGroqLLM(
             model=model,
             temperature=temperature,
             max_tokens=max_tokens,
         )
+        # Apply fallback chain so rate-limit exhaustion falls through
+        # to Gemini/Anthropic/OpenAI/Ollama automatically
+        return self._apply_fallbacks(groq_llm, "groq", temperature, max_tokens, role)
 
     def _create_gemini(
         self,

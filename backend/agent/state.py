@@ -1,4 +1,5 @@
-from typing import TypedDict, Literal, Annotated, Dict, Any, Optional, NotRequired, List, Union
+from typing import Literal, Annotated, Dict, Any, Optional, NotRequired, List, Union
+from typing_extensions import TypedDict, Literal, Annotated, Dict, Any, Optional, NotRequired, List, Union
 from langgraph.graph import add_messages
 from langchain_core.messages import BaseMessage
 from .schema import ActionType, ObservationType
@@ -10,7 +11,7 @@ from agent.stage_checkpoint import StageCheckpoint, VerificationMode
 class AgentState(TypedDict, total=False):
     # ── Core State ────────────────────────────────────────────────────
     messages: Annotated[list[BaseMessage], add_messages]   # full chat history
-    status: Literal['plan', 'research', 'setup_env', 'judge', 'supervisor', 'backend_subagent', 'frontend_subagent', 'contract_check', 'merge', 'execute', 'validate', 'done', 'error']
+    status: Literal['plan', 'plan_refine', 'architecture', 'research', 'setup_env', 'judge', 'judge_structural', 'supervisor', 'implement', 'backend_subagent', 'frontend_subagent', 'contract_check', 'contract_structural', 'merge', 'execute', 'execute_structural', 'validate', 'validate_structural', 'done', 'error']
     session_id: str
     trace_id: str
     stage_id: str
@@ -45,6 +46,7 @@ class AgentState(TypedDict, total=False):
     retries: int                            # global retry counter
     retry_count: int                        # retry count for current task
     max_retries: int                        # maximum retries allowed (default: 5)
+    node_exception: Optional[Dict[str, str]]        # exception dict with type and message
     has_execution_errors: bool              # flag indicating errors in last execution
     has_validation_errors: bool             # flag indicating validation errors
     validation_errors: List[str]            # list of validation error messages
@@ -55,7 +57,16 @@ class AgentState(TypedDict, total=False):
     backend_retries: int                    # retry counter for backend subagent
     frontend_retries: int                   # retry counter for frontend subagent
     contract_mismatch: bool                 # flag indicating if the contract check failed
-    
+
+    # ── Pipeline Refactor & Two-Tier Gates ────────────────────────────
+    subagents_needed: List[Literal["backend", "frontend"]]  # required subagents for execution iteration
+    judge_structural_ok: bool               # flag indicating judge structural validation passed
+    contract_structural_ok: bool            # flag indicating contract structural diff passed
+    execute_structural_ok: bool             # flag indicating execution pre-conditions passed
+    validate_structural_ok: bool            # flag indicating test artifacts exist and are parseable
+    execute_retry_count: int                # retry count for execution semantic checks (default: 0)
+    validate_retry_count: int               # retry count for validation semantic checks (default: 0)
+
     # ── Phase 1: Token & Context Management ──────────────────────────
     token_count: int                        # current total token usage
     context_budget: Dict[str, int]          # token budget allocation

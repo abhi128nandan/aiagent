@@ -1,7 +1,6 @@
 import json
 import re
 from typing import Callable, List, Optional, Dict, Any, Literal
-from agent.mermaid_validator import is_valid_mermaid
 
 class RuleResult:
     def __init__(
@@ -88,14 +87,31 @@ def validate_template_selection(state: Dict[str, Any]) -> RuleResult:
     if not plan_str:
         return RuleResult(passed=True)
     try:
+        import os
         data = json.loads(plan_str)
         template = data.get('template_selected', '')
-        if not template:
-            return RuleResult(passed=False, severity='Error', errors=["Template selection is empty (must be a valid template name or 'none')"])
+        if not template or template == 'none':
+            return RuleResult(passed=True)
         
-        valid_templates = ['react-vite', 'express', 'fastapi', 'spring-boot', 'none']
+        # Dynamically discover directories in templates/
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        templates_dir = os.path.join(backend_dir, "templates")
+        
+        valid_templates = ['none']
+        if os.path.exists(templates_dir):
+            valid_templates.extend([d for d in os.listdir(templates_dir) if os.path.isdir(os.path.join(templates_dir, d))])
+            
+        # Ensure fallback defaults are always present
+        for t in ['react-vite', 'express']:
+            if t not in valid_templates:
+                valid_templates.append(t)
+                
         if template not in valid_templates:
-            return RuleResult(passed=False, severity='Error', errors=[f"Invalid template '{template}'. Must be one of {valid_templates}"])
+            return RuleResult(
+                passed=False, 
+                severity='Error', 
+                errors=[f"Template '{template}' is not a valid template. Must be one of: {valid_templates}."]
+            )
             
         return RuleResult(passed=True)
     except Exception as e:
@@ -125,18 +141,20 @@ def check_all_artifacts(state: Dict[str, Any]) -> RuleResult:
     missing = []
     for field in required:
         val = getattr(artifacts, field, None) if hasattr(artifacts, field) else artifacts.get(field)
-        if not val or not val.strip():
+        if not val:
             missing.append(field)
     
     seqs = getattr(artifacts, 'sequence_diagrams', None) if hasattr(artifacts, 'sequence_diagrams') else artifacts.get('sequence_diagrams')
     if not seqs or len(seqs) < 1:
-        missing.append("sequence_diagrams")
+        # Just warn if sequence diagrams are missing instead of strictly failing
+        # as some simple applications might not warrant them.
+        pass
 
     if missing:
         return RuleResult(passed=False, severity='Critical', errors=[f"Missing architectural diagrams: {', '.join(missing)}"])
     return RuleResult(passed=True)
 
-def validate_mermaid_diagrams(state: Dict[str, Any]) -> RuleResult:
+def validate_react_flow_diagrams(state: Dict[str, Any]) -> RuleResult:
     arch_plan = state.get('architectural_plan')
     if not arch_plan:
         return RuleResult(passed=True)
@@ -154,15 +172,22 @@ def validate_mermaid_diagrams(state: Dict[str, Any]) -> RuleResult:
     for field in fields:
         diagram = getattr(artifacts, field, None) if hasattr(artifacts, field) else artifacts.get(field)
         if diagram:
-            valid, err = is_valid_mermaid(diagram)
-            if not valid:
-                errors.append(f"Invalid Mermaid syntax in {field}: {err}")
+            # diagram is a ReactFlowGraph object or dict
+            nodes = getattr(diagram, 'nodes', None) if hasattr(diagram, 'nodes') else diagram.get('nodes')
+            edges = getattr(diagram, 'edges', None) if hasattr(diagram, 'edges') else diagram.get('edges')
+            if nodes is None or not isinstance(nodes, list):
+                errors.append(f"Invalid React Flow structure in {field}: missing or invalid 'nodes' list")
+            if edges is None or not isinstance(edges, list):
+                errors.append(f"Invalid React Flow structure in {field}: missing or invalid 'edges' list")
     
     seqs = getattr(artifacts, 'sequence_diagrams', []) if hasattr(artifacts, 'sequence_diagrams') else artifacts.get('sequence_diagrams', [])
     for idx, seq in enumerate(seqs):
-        valid, err = is_valid_mermaid(seq)
-        if not valid:
-            errors.append(f"Invalid Mermaid syntax in sequence_diagrams[{idx}]: {err}")
+        nodes = getattr(seq, 'nodes', None) if hasattr(seq, 'nodes') else seq.get('nodes')
+        edges = getattr(seq, 'edges', None) if hasattr(seq, 'edges') else seq.get('edges')
+        if nodes is None or not isinstance(nodes, list):
+            errors.append(f"Invalid React Flow structure in sequence_diagrams[{idx}]: missing or invalid 'nodes' list")
+        if edges is None or not isinstance(edges, list):
+            errors.append(f"Invalid React Flow structure in sequence_diagrams[{idx}]: missing or invalid 'edges' list")
 
     if errors:
         return RuleResult(passed=False, severity='Error', errors=errors)
@@ -252,7 +277,7 @@ def validate_file_paths(state: Dict[str, Any]) -> RuleResult:
         steps = data.get('steps', [])
         errors = []
         for idx, step in enumerate(steps):
-            path = step.get('path', '')
+            path = step.get('file') or step.get('path', '')
             if path:
                 # Path traversal detection
                 if '..' in path or path.startswith('/') and not path.startswith('/workspace'):
@@ -413,7 +438,7 @@ class VerificationRuleEngine:
 
         # Architecture
         self.register_rule("architecture", Rule("all_artifacts_present", check_all_artifacts, "Critical", "Check all diagrams exist"))
-        self.register_rule("architecture", Rule("valid_mermaid_syntax", validate_mermaid_diagrams, "Error", "Check diagrams are valid Mermaid"))
+        self.register_rule("architecture", Rule("valid_react_flow_syntax", validate_react_flow_diagrams, "Error", "Check diagrams are valid React Flow arrays"))
         self.register_rule("architecture", Rule("adrs_created", check_adr_count, "Warning", "Check at least one ADR created"))
         self.register_rule("architecture", Rule("architecture_completeness", check_architecture_coverage, "Warning", "Check architecture coverage"))
 

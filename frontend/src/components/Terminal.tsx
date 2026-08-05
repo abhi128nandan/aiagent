@@ -15,7 +15,7 @@ import {
     X,
     Cpu,
     Clock,
-    AlertTriangle,
+
     AlertCircle,
     ListCollapse
 } from 'lucide-react';
@@ -634,7 +634,7 @@ export const TerminalLog: React.FC = () => {
                 e.preventDefault();
                 const targetPid = activeCommandPid || foregroundProcess?.pid;
                 if (activeCommand || targetPid) {
-                    killProcess(targetPid || null, 2); // SIGINT
+                    if (targetPid) killProcess(targetPid, 2); // SIGINT
                     if (targetPid) {
                         appendInteractiveOutput(`\r\n\x1b[33mCtrl+C sent to process PID ${targetPid}\x1b[0m\r\n`, activeSessionId);
                     } else {
@@ -652,7 +652,7 @@ export const TerminalLog: React.FC = () => {
             e.preventDefault();
             const targetPid = activeCommandPid || foregroundProcess?.pid;
             if (activeCommand || targetPid) {
-                killProcess(targetPid || null, 20); // SIGTSTP
+                if (targetPid) killProcess(targetPid, 20); // SIGTSTP
                 if (targetPid) {
                     appendInteractiveOutput(`\r\n\x1b[33mCtrl+Z (SIGTSTP) sent to process PID ${targetPid}\x1b[0m\r\n`, activeSessionId);
                 } else {
@@ -762,7 +762,7 @@ export const TerminalLog: React.FC = () => {
                 : `Are you sure you want to force kill the active terminal shell? This will terminate the running session and restart it. This cannot be undone.`,
             type: 'kill',
             action: () => {
-                killProcess(pid, 9); // SIGKILL
+                if (pid) killProcess(pid, 9); // SIGKILL
                 if (pid) {
                     appendInteractiveOutput(`\r\n\x1b[31m☠ SIGKILL sent to process PID ${pid}\x1b[0m\r\n`, activeSessionId);
                 } else {
@@ -915,7 +915,7 @@ export const TerminalLog: React.FC = () => {
                         <button
                             onClick={() => {
                                 const pid = activeCommandPid || foregroundProcess?.pid;
-                                killProcess(pid || null, 2); // SIGINT stop
+                                if (pid) killProcess(pid, 2); // SIGINT stop
                                 if (pid) {
                                     appendInteractiveOutput(`\r\n\x1b[33mStop button clicked. SIGINT sent to process PID ${pid}\x1b[0m\r\n`, activeSessionId);
                                 } else {

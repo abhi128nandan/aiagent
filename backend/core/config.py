@@ -78,9 +78,13 @@ class Settings(BaseSettings):
     RAG_TOP_K: int = 5
 
     # ── LangSmith Observability ─────────────────────────────────────────
+    LANGSMITH_TRACING: bool = False
     LANGCHAIN_TRACING_V2: bool = False
+    LANGSMITH_API_KEY: Optional[str] = None
     LANGCHAIN_API_KEY: Optional[str] = None
-    LANGCHAIN_PROJECT: str = "ai-agent-builder"
+    LANGSMITH_PROJECT: str = "aiagent"
+    LANGCHAIN_PROJECT: str = "aiagent"
+    LANGSMITH_ENDPOINT: str = "https://api.smith.langchain.com"
     LANGCHAIN_ENDPOINT: str = "https://api.smith.langchain.com"
 
     # ── Context Management ─────────────────────────────────────────────
@@ -146,12 +150,32 @@ class Settings(BaseSettings):
         """Export LangSmith configuration parameters to os.environ so they are picked up by LangChain/LangGraph."""
         import logging
         logger = logging.getLogger("core.config")
-        if self.LANGCHAIN_TRACING_V2 and self.LANGCHAIN_API_KEY:
+
+        tracing = (
+            self.LANGSMITH_TRACING
+            or self.LANGCHAIN_TRACING_V2
+            or os.environ.get("LANGSMITH_TRACING", "").lower() in ("true", "1")
+            or os.environ.get("LANGCHAIN_TRACING_V2", "").lower() in ("true", "1")
+        )
+        api_key = (
+            self.LANGSMITH_API_KEY
+            or self.LANGCHAIN_API_KEY
+            or os.environ.get("LANGSMITH_API_KEY")
+            or os.environ.get("LANGCHAIN_API_KEY")
+        )
+        project = self.LANGSMITH_PROJECT or self.LANGCHAIN_PROJECT or "aiagent"
+        endpoint = self.LANGSMITH_ENDPOINT or self.LANGCHAIN_ENDPOINT or "https://api.smith.langchain.com"
+
+        if tracing and api_key:
+            os.environ["LANGSMITH_TRACING"] = "true"
             os.environ["LANGCHAIN_TRACING_V2"] = "true"
-            os.environ["LANGCHAIN_API_KEY"] = self.LANGCHAIN_API_KEY
-            os.environ["LANGCHAIN_PROJECT"] = self.LANGCHAIN_PROJECT
-            os.environ["LANGCHAIN_ENDPOINT"] = self.LANGCHAIN_ENDPOINT
-            logger.info(f"LangSmith tracing enabled for project: {self.LANGCHAIN_PROJECT}")
+            os.environ["LANGSMITH_API_KEY"] = api_key
+            os.environ["LANGCHAIN_API_KEY"] = api_key
+            os.environ["LANGSMITH_PROJECT"] = project
+            os.environ["LANGCHAIN_PROJECT"] = project
+            os.environ["LANGSMITH_ENDPOINT"] = endpoint
+            os.environ["LANGCHAIN_ENDPOINT"] = endpoint
+            logger.info(f"LangSmith tracing enabled for project: {project}")
 
     class Config:
         env_file = ".env"

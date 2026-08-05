@@ -1,7 +1,9 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 fastapi
 uvicorn
 docker
 langgraph>=0.2.0
+langsmith
 langchain
 langchain-core
 langchain-community
@@ -33,3 +35,5 @@ sentence-transformers
 chromadb
 # ── Phase 5: Web Research ──
 ddgs
+# ── Phase 6: Autonomous Code Analysis Engine ──
+networkx
