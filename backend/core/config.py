@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "agent_state"
+    USE_MEMORY_CHECKPOINTER: bool = True
 
     @property
     def database_url(self) -> str:
@@ -77,6 +78,16 @@ class Settings(BaseSettings):
     RAG_ENABLED: bool = True
     RAG_TOP_K: int = 5
 
+    # ── LangSmith Observability ─────────────────────────────────────────
+    LANGSMITH_TRACING: bool = False
+    LANGCHAIN_TRACING_V2: bool = False
+    LANGSMITH_API_KEY: Optional[str] = None
+    LANGCHAIN_API_KEY: Optional[str] = None
+    LANGSMITH_PROJECT: str = "aiagent"
+    LANGCHAIN_PROJECT: str = "aiagent"
+    LANGSMITH_ENDPOINT: str = "https://api.smith.langchain.com"
+    LANGCHAIN_ENDPOINT: str = "https://api.smith.langchain.com"
+
     # ── Context Management ─────────────────────────────────────────────
     DEFAULT_CONTEXT_LIMIT: int = 8192  # Override per-model limits if needed
     CONTEXT_PRUNE_KEEP_LAST: int = 10  # Keep last N messages when pruning
@@ -85,7 +96,7 @@ class Settings(BaseSettings):
     SANDBOX_IMAGE: str = "agent-sandbox:latest"
     SANDBOX_MEM_LIMIT: str = "512m"
     SANDBOX_CPU_QUOTA: int = 50000
-    SANDBOX_TIMEOUT: int = 30  # seconds per command
+    SANDBOX_TIMEOUT: int = 300  # seconds per command
     SANDBOX_CLEANUP_INTERVAL: int = 3600  # 1 hour
 
     def get_groq_keys(self) -> list[str]:
@@ -135,6 +146,37 @@ class Settings(BaseSettings):
                 keys.append(single)
 
         return keys
+
+    def export_to_env(self) -> None:
+        """Export LangSmith configuration parameters to os.environ so they are picked up by LangChain/LangGraph."""
+        import logging
+        logger = logging.getLogger("core.config")
+
+        tracing = (
+            self.LANGSMITH_TRACING
+            or self.LANGCHAIN_TRACING_V2
+            or os.environ.get("LANGSMITH_TRACING", "").lower() in ("true", "1")
+            or os.environ.get("LANGCHAIN_TRACING_V2", "").lower() in ("true", "1")
+        )
+        api_key = (
+            self.LANGSMITH_API_KEY
+            or self.LANGCHAIN_API_KEY
+            or os.environ.get("LANGSMITH_API_KEY")
+            or os.environ.get("LANGCHAIN_API_KEY")
+        )
+        project = self.LANGSMITH_PROJECT or self.LANGCHAIN_PROJECT or "aiagent"
+        endpoint = self.LANGSMITH_ENDPOINT or self.LANGCHAIN_ENDPOINT or "https://api.smith.langchain.com"
+
+        if tracing and api_key:
+            os.environ["LANGSMITH_TRACING"] = "true"
+            os.environ["LANGCHAIN_TRACING_V2"] = "true"
+            os.environ["LANGSMITH_API_KEY"] = api_key
+            os.environ["LANGCHAIN_API_KEY"] = api_key
+            os.environ["LANGSMITH_PROJECT"] = project
+            os.environ["LANGCHAIN_PROJECT"] = project
+            os.environ["LANGSMITH_ENDPOINT"] = endpoint
+            os.environ["LANGCHAIN_ENDPOINT"] = endpoint
+            logger.info(f"LangSmith tracing enabled for project: {project}")
 
     class Config:
         env_file = ".env"

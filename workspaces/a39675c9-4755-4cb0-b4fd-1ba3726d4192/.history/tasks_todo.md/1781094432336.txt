@@ -1,0 +1,28 @@
+# Project: my-app
+
+## Description
+A simple ecommerce website
+
+## Tasks Checklist
+
+- [x] **MODIFY** `src/App.jsx`
+  *Description:* Replace the default Vite React boilerplate with the application layout: add a Navbar component import, product grid section, shopping cart sidebar, and footer. Set up React state for cart items using useState.
+
+- [ ] **CREATE** `src/components/Navbar.jsx`
+  *Description:* Create a responsive navigation bar with logo, search input, cart icon with item count badge, and navigation links.
+
+- [x] **MODIFY** `src/index.css`
+  *Description:* Replace default Vite styles with application-specific CSS: color variables, responsive grid layout, card styles, animations.
+
+- [ ] **CREATE** `src/components/ProductGrid.jsx`
+  *Description:* Create a component to display the product grid. Each product should have an image, title, price, and add-to-cart button. Use React state to manage product data.
+
+- [ ] **CREATE** `src/components/CartSidebar.jsx`
+  *Description:* Create a sidebar component for the shopping cart. It should display items in the cart, their quantities, and a total price. Include a checkout button.
+
+- [ ] **CREATE** `src/data/products.js`
+  *Description:* Create a file to store product data as an array of objects. Each object should contain properties like id, title, description, image, price, and stock.
+
+- [x] **MODIFY** `src/App.css`
+  *Description:* Add styles for the product grid, cart sidebar, and other UI elements to ensure a consistent and responsive design.
+

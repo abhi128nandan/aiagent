@@ -1,0 +1,43 @@
+# Project: To-Do App
+
+## Description
+Task management application with task creation, completion status, due dates, priority settings, and categorization
+
+## Tasks Checklist
+
+- [ ] **MODIFY** `src/App.jsx`
+  *Description:* Replace Vite counter boilerplate with To-Do App UI: create TaskList component with useState for task array, TaskForm component for input, and TaskItem component for rendering. Add state for task title, dueDate, priority (low/medium/high), category, and completed status. Implement addTask, updateTask, deleteTask functions. Add useEffect to fetch tasks from backend on mount.
+
+- [ ] **MODIFY** `src/App.css`
+  *Description:* Add CSS for task list container with flexbox layout, task cards with priority color indicators (low: green, medium: yellow, high: red), category tags with rounded borders, completed task strikethrough, due date formatting, and responsive design for mobile/tablet/desktop.
+
+- [x] **CREATE** `src/components/TaskForm.jsx`
+  *Description:* Create TaskForm component with title input, date picker for dueDate, priority select dropdown, category text input, and submit button. Implement form validation for required fields and connect to addTask function via props.
+
+- [ ] **CREATE** `src/components/TaskItem.jsx`
+  *Description:* Create TaskItem component with checkbox for completion status, task title display, priority indicator, category tag, due date display, and delete button. Add onClick handler for checkbox to toggle completed status and call updateTask function.
+
+- [x] **CREATE** `src/components/TaskList.jsx`
+  *Description:* Create TaskList component that maps over task array and renders TaskItem for each task. Add filter functionality by priority/category and search by title. Implement sorting by due date and completion status.
+
+- [ ] **CREATE** `server.js`
+  *Description:* Create Express server with MongoDB connection using Mongoose. Define Task model with title, dueDate, priority, category, completed fields. Implement CRUD routes: GET /tasks, POST /tasks, PUT /tasks/:id, DELETE /tasks/:id. Add CORS middleware for frontend communication.
+
+- [ ] **CREATE** `models/Task.js`
+  *Description:* Define Mongoose schema for Task with required fields: title (String, required), dueDate (Date), priority (String, enum: low/medium/high), category (String), completed (Boolean, default: false). Add timestamps for createdAt/updatedAt.
+
+- [ ] **CREATE** `routes/tasks.js`
+  *Description:* Create Express route handler for task operations. Implement GET /tasks to return all tasks, POST /tasks to create new task, PUT /tasks/:id to update task, DELETE /tasks/:id to delete task. Add error handling middleware.
+
+- [ ] **MODIFY** `package.json`
+  *Description:* Add backend dependencies: express, mongoose, cors, dotenv. Add devDependencies: nodemon. Add start script: 'node server.js' and dev script: 'nodemon server.js'.
+
+- [ ] **CREATE** `.env`
+  *Description:* Create environment file with MONGO_URI for MongoDB connection string and PORT for backend server port (default 5000).
+
+- [ ] **MODIFY** `src/index.css`
+  *Description:* Add global styles for body font, container max-width, button styles, form input validation, and transition animations for task completion state changes.
+
+- [ ] **MODIFY** `src/main.jsx`
+  *Description:* Update main.jsx to import App component and render it with ReactDOM.createRoot. Add error boundary for uncaught exceptions.
+

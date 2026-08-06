@@ -1,0 +1,235 @@
+INFO:     Started server process [825950]
+INFO:     Waiting for application startup.
+{"timestamp": "2026-06-02 18:13:57,573", "level": "INFO", "logger": "main", "message": "app_starting", "app": "AI Agent Builder", "version": "0.2.0"}
+{"timestamp": "2026-06-02 18:13:57,573", "level": "INFO", "logger": "services.sandbox_service", "message": "sandbox_cleanup_task_started", "interval": 3600, "max_age": 86400}
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+{"timestamp": "2026-06-02 18:14:04,373", "level": "INFO", "logger": "routes.agent", "message": "session_created", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9"}
+INFO:     127.0.0.1:46940 - "POST /api/agent/sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46948 - "WebSocket /api/agent/ws" [accepted]
+INFO:     connection open
+{"timestamp": "2026-06-02 18:14:04,586", "level": "INFO", "logger": "routes.agent", "message": "ws_session_start", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "action": "start", "chat_mode": "build", "num_locked": 0}
+{"timestamp": "2026-06-02 18:14:11,380", "level": "INFO", "logger": "agent.graph", "message": "checkpointer_init", "backend": "postgres"}
+{"timestamp": "2026-06-02 18:14:11,516", "level": "INFO", "logger": "agent.llm", "message": "groq_llm_created", "model": "groq/llama-3.3-70b-versatile", "role": "planner", "num_keys": 1, "mode": "single"}
+{"timestamp": "2026-06-02 18:14:11,679", "level": "INFO", "logger": "runtime", "message": "container_auto_paused", "container": "agent-sandbox-e47960cd-1780403967"}
+{"timestamp": "2026-06-02 18:14:11,698", "level": "INFO", "logger": "runtime", "message": "container_start", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "container": "agent-sandbox-af69a21f-1780404251"}
+{"timestamp": "2026-06-02 18:14:13,647", "level": "INFO", "logger": "agent.groq_key_pool", "message": "groq_key_pool_initialized", "num_keys": 1, "key_suffixes": ["...IRPR"]}
+{"timestamp": "2026-06-02 18:14:13,647", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 0}
+/media/aashikant/GAME Volume/aicode/myaiagent/backend/agent/rate_limited_llm.py:97: LangChainDeprecationWarning: The class `ChatLiteLLM` was deprecated in LangChain 0.3.24 and will be removed in 1.0. An updated version of the class exists in the `langchain-litellm package and should be used instead. To use it run `pip install -U `langchain-litellm` and import as `from `langchain_litellm import ChatLiteLLM``.
+  return ChatLiteLLM(**params)
+[92m18:14:15 - LiteLLM:WARNING[0m: common_utils.py:979 - litellm: could not pre-load bedrock-runtime response stream shape — Bedrock event-stream decoding will be unavailable. Error: No module named 'botocore'
+[92m18:14:15 - LiteLLM:WARNING[0m: common_utils.py:24 - litellm: could not pre-load sagemaker-runtime response stream shape — SageMaker event-stream decoding will be unavailable. Error: No module named 'botocore'
+{"timestamp": "2026-06-02 18:14:17,821", "level": "INFO", "logger": "agent.rate_limited_llm", "message": "groq_request_success", "attempt": 1, "key_suffix": "...IRPR", "model": "groq/llama-3.3-70b-versatile", "tokens_estimated": 1535}
+{"timestamp": "2026-06-02 18:14:17,825", "level": "INFO", "logger": "agent.research_node", "message": "research_start", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "num_queries": 3, "queries": ["flask python project structure setup 2026", "flask sqlite integration setup python", "html_css_js flask full-stack project structure python 2026"]}
+{"timestamp": "2026-06-02 18:14:19,031", "level": "INFO", "logger": "agent.web_search", "message": "web_search_ok", "query": "flask python project structure setup 2026", "results": 2}
+{"timestamp": "2026-06-02 18:14:19,223", "level": "INFO", "logger": "agent.web_search", "message": "page_fetch_ok", "url": "https://flask.palletsprojects.com/en/stable/tutorial/layout/", "chars": 1517}
+{"timestamp": "2026-06-02 18:14:20,226", "level": "INFO", "logger": "agent.web_search", "message": "web_search_ok", "query": "flask sqlite integration setup python", "results": 2}
+{"timestamp": "2026-06-02 18:14:20,429", "level": "INFO", "logger": "agent.web_search", "message": "page_fetch_ok", "url": "https://realpython.com/flask-project/", "chars": 1517}
+{"timestamp": "2026-06-02 18:14:20,997", "level": "INFO", "logger": "agent.web_search", "message": "web_search_ok", "query": "html_css_js flask full-stack project structure python 2026", "results": 2}
+{"timestamp": "2026-06-02 18:14:21,320", "level": "INFO", "logger": "agent.web_search", "message": "page_fetch_ok", "url": "https://oneuptime.com/blog/post/2026-02-02-sqlite-flask/view", "chars": 1517}
+{"timestamp": "2026-06-02 18:14:22,086", "level": "INFO", "logger": "agent.web_search", "message": "page_fetch_ok", "url": "https://www.youtube.com/watch?v=Z1RJmh_OqeA", "chars": 721}
+{"timestamp": "2026-06-02 18:14:22,187", "level": "INFO", "logger": "agent.web_search", "message": "page_fetch_ok", "url": "https://github.com/LandAzad/building-management-pro", "chars": 1517}
+{"timestamp": "2026-06-02 18:14:22,863", "level": "INFO", "logger": "agent.web_search", "message": "page_fetch_ok", "url": "https://www.digitalocean.com/community/tutorials/how-to-use-an-sqlite-database-in-a-flask-application", "chars": 1517}
+{"timestamp": "2026-06-02 18:14:22,863", "level": "INFO", "logger": "agent.llm", "message": "groq_llm_created", "model": "groq/llama-3.3-70b-versatile", "role": "validator", "num_keys": 1, "mode": "single"}
+{"timestamp": "2026-06-02 18:14:23,370", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 1}
+{"timestamp": "2026-06-02 18:14:26,445", "level": "INFO", "logger": "agent.rate_limited_llm", "message": "groq_request_success", "attempt": 1, "key_suffix": "...IRPR", "model": "groq/llama-3.3-70b-versatile", "tokens_estimated": 3787}
+{"timestamp": "2026-06-02 18:14:26,446", "level": "INFO", "logger": "agent.research_node", "message": "research_complete", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "context_length": 3914, "num_results": 6}
+{"timestamp": "2026-06-02 18:14:26,950", "level": "INFO", "logger": "agent.nodes", "message": "setup_env_installing_packages", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "packages": ["sqlite3"]}
+{"timestamp": "2026-06-02 18:14:39,552", "level": "INFO", "logger": "agent.nodes", "message": "setup_env_complete", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "environment": "Runtime(s): python3\nFrontend stack: html_css_js\nBackend stack: flask\nDatabase: sqlite\nLanguage: python\nSystem packages installed: sqlite3\nVerified versions: node: v20.20.2 | npm: 10.8.2 | python: Python 3.11.15 | java: bash: java: command not found | go: N/A"}
+{"timestamp": "2026-06-02 18:14:39,555", "level": "INFO", "logger": "agent.judge_node", "message": "judge_start", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "attempt": 1}
+{"timestamp": "2026-06-02 18:14:39,558", "level": "INFO", "logger": "agent.llm", "message": "groq_llm_created", "model": "groq/llama-3.3-70b-versatile", "role": "validator", "num_keys": 1, "mode": "single"}
+{"timestamp": "2026-06-02 18:14:39,568", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 2}
+{"timestamp": "2026-06-02 18:14:40,084", "level": "INFO", "logger": "agent.rate_limited_llm", "message": "groq_request_success", "attempt": 1, "key_suffix": "...IRPR", "model": "groq/llama-3.3-70b-versatile", "tokens_estimated": 1897}
+{"timestamp": "2026-06-02 18:14:40,087", "level": "INFO", "logger": "agent.judge_node", "message": "judge_complete", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "approved": true, "score": 9, "critique_len": 251}
+{"timestamp": "2026-06-02 18:14:40,095", "level": "INFO", "logger": "agent.llm", "message": "groq_llm_created", "model": "groq/llama-3.3-70b-versatile", "role": "coder", "num_keys": 1, "mode": "single"}
+{"timestamp": "2026-06-02 18:14:40,822", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 3}
+{"timestamp": "2026-06-02 18:14:44,412", "level": "INFO", "logger": "agent.rate_limited_llm", "message": "groq_request_success", "attempt": 1, "key_suffix": "...IRPR", "model": "groq/llama-3.3-70b-versatile", "tokens_estimated": 4672}
+{"timestamp": "2026-06-02 18:14:46,318", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "app.py"}
+{"timestamp": "2026-06-02 18:14:47,302", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "models.py"}
+{"timestamp": "2026-06-02 18:14:49,906", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "templates/index.html"}
+{"timestamp": "2026-06-02 18:14:50,899", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "static/style.css"}
+{"timestamp": "2026-06-02 18:14:53,735", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "static/script.js"}
+{"timestamp": "2026-06-02 18:14:54,304", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "requirements.txt"}
+{"timestamp": "2026-06-02 18:14:55,189", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "run", "detail": "python3 -m pip install -r requirements.txt > dev_server.log 2>&1 &"}
+{"timestamp": "2026-06-02 18:14:55,763", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "run", "detail": "python3 app.py > app.log 2>&1 &"}
+{"timestamp": "2026-06-02 18:14:56,695", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "finish", "detail": ""}
+{"timestamp": "2026-06-02 18:14:56,840", "level": "INFO", "logger": "agent.nodes", "message": "validation_run_compile_checks", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9"}
+{"timestamp": "2026-06-02 18:14:57,795", "level": "INFO", "logger": "agent.nodes", "message": "validation_waiting_for_port", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9"}
+{"timestamp": "2026-06-02 18:15:00,580", "level": "INFO", "logger": "agent.llm", "message": "groq_llm_created", "model": "groq/llama-3.3-70b-versatile", "role": "coder", "num_keys": 1, "mode": "single"}
+{"timestamp": "2026-06-02 18:15:00,593", "level": "INFO", "logger": "agent.error_analyzer", "message": "error_analyzed", "category": "import", "severity": "medium", "error_type": "ModuleNotFoundError", "file": "/workspace/app.py", "line": 2}
+{"timestamp": "2026-06-02 18:15:00,594", "level": "INFO", "logger": "agent.nodes", "message": "implement_with_error_analysis", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "category": "import", "severity": "medium"}
+{"timestamp": "2026-06-02 18:15:01,309", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 4}
+{"timestamp": "2026-06-02 18:15:04,296", "level": "INFO", "logger": "agent.rate_limited_llm", "message": "groq_request_success", "attempt": 1, "key_suffix": "...IRPR", "model": "groq/llama-3.3-70b-versatile", "tokens_estimated": 6570}
+{"timestamp": "2026-06-02 18:15:06,692", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "app.py"}
+{"timestamp": "2026-06-02 18:15:06,949", "level": "INFO", "logger": "agent.file_history", "message": "file_history_saved", "path": "app.py", "history_path": ".history/app.py/1780404306727.txt", "size": 1250}
+{"timestamp": "2026-06-02 18:15:08,072", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "models.py"}
+{"timestamp": "2026-06-02 18:15:08,326", "level": "INFO", "logger": "agent.file_history", "message": "file_history_saved", "path": "models.py", "history_path": ".history/models.py/1780404308106.txt", "size": 297}
+{"timestamp": "2026-06-02 18:15:10,782", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "templates/index.html"}
+{"timestamp": "2026-06-02 18:15:11,034", "level": "INFO", "logger": "agent.file_history", "message": "file_history_saved", "path": "templates/index.html", "history_path": ".history/templates/index.html/1780404310815.txt", "size": 1204}
+{"timestamp": "2026-06-02 18:15:12,199", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "static/style.css"}
+{"timestamp": "2026-06-02 18:15:12,474", "level": "INFO", "logger": "agent.file_history", "message": "file_history_saved", "path": "static/style.css", "history_path": ".history/static/style.css/1780404312249.txt", "size": 417}
+{"timestamp": "2026-06-02 18:15:16,103", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "static/script.js"}
+{"timestamp": "2026-06-02 18:15:16,361", "level": "INFO", "logger": "agent.file_history", "message": "file_history_saved", "path": "static/script.js", "history_path": ".history/static/script.js/1780404316140.txt", "size": 1462}
+{"timestamp": "2026-06-02 18:15:16,987", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "requirements.txt"}
+{"timestamp": "2026-06-02 18:15:17,242", "level": "INFO", "logger": "agent.file_history", "message": "file_history_saved", "path": "requirements.txt", "history_path": ".history/requirements.txt/1780404317022.txt", "size": 36}
+{"timestamp": "2026-06-02 18:15:18,003", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "run", "detail": "python3 -m pip install -r requirements.txt > dev_server.log 2>&1 &"}
+{"timestamp": "2026-06-02 18:15:18,623", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "run", "detail": "python3 app.py > app.log 2>&1 &"}
+{"timestamp": "2026-06-02 18:15:19,206", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "finish", "detail": ""}
+{"timestamp": "2026-06-02 18:15:19,274", "level": "INFO", "logger": "agent.nodes", "message": "validation_run_compile_checks", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9"}
+{"timestamp": "2026-06-02 18:15:20,579", "level": "INFO", "logger": "agent.nodes", "message": "validation_waiting_for_port", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9"}
+{"timestamp": "2026-06-02 18:15:23,381", "level": "INFO", "logger": "agent.llm", "message": "groq_llm_created", "model": "groq/llama-3.3-70b-versatile", "role": "coder", "num_keys": 1, "mode": "single"}
+{"timestamp": "2026-06-02 18:15:23,393", "level": "INFO", "logger": "agent.error_analyzer", "message": "error_analyzed", "category": "import", "severity": "medium", "error_type": "ImportError", "file": "/workspace/app.py", "line": 1}
+{"timestamp": "2026-06-02 18:15:23,394", "level": "INFO", "logger": "agent.nodes", "message": "implement_with_error_analysis", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "category": "import", "severity": "medium"}
+{"timestamp": "2026-06-02 18:15:24,112", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 0}
+
+[1;31mGive Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new[0m
+LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
+
+{"timestamp": "2026-06-02 18:15:24,243", "level": "WARNING", "logger": "agent.groq_key_pool", "message": "groq_key_rate_limited", "key_suffix": "IRPR", "cooldown_seconds": 2.955, "consecutive_errors": 1}
+{"timestamp": "2026-06-02 18:15:24,243", "level": "WARNING", "logger": "agent.rate_limited_llm", "message": "groq_rate_limit_hit", "attempt": 1, "key_suffix": "...IRPR", "retry_after": 2.955, "remaining_keys": 0}
+{"timestamp": "2026-06-02 18:15:24,539", "level": "INFO", "logger": "agent.groq_key_pool", "message": "groq_all_keys_exhausted_waiting", "wait_seconds": 2.7, "pool_size": 1, "model": "groq/llama-3.3-70b-versatile"}
+{"timestamp": "2026-06-02 18:15:27,198", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 0}
+
+[1;31mGive Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new[0m
+LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
+
+{"timestamp": "2026-06-02 18:15:27,325", "level": "WARNING", "logger": "agent.groq_key_pool", "message": "groq_key_rate_limited", "key_suffix": "IRPR", "cooldown_seconds": 6.3, "consecutive_errors": 2}
+{"timestamp": "2026-06-02 18:15:27,325", "level": "WARNING", "logger": "agent.rate_limited_llm", "message": "groq_rate_limit_hit", "attempt": 2, "key_suffix": "...IRPR", "retry_after": 6.3, "remaining_keys": 0}
+{"timestamp": "2026-06-02 18:15:27,955", "level": "INFO", "logger": "agent.groq_key_pool", "message": "groq_all_keys_exhausted_waiting", "wait_seconds": 5.7, "pool_size": 1, "model": "groq/llama-3.3-70b-versatile"}
+{"timestamp": "2026-06-02 18:15:33,626", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 0}
+{"timestamp": "2026-06-02 18:15:36,917", "level": "INFO", "logger": "agent.rate_limited_llm", "message": "groq_request_success", "attempt": 3, "key_suffix": "...IRPR", "model": "groq/llama-3.3-70b-versatile", "tokens_estimated": 8297}
+{"timestamp": "2026-06-02 18:15:39,217", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "app.py"}
+{"timestamp": "2026-06-02 18:15:39,474", "level": "INFO", "logger": "agent.file_history", "message": "file_history_saved", "path": "app.py", "history_path": ".history/app.py/1780404339255.txt", "size": 1250}
+{"timestamp": "2026-06-02 18:15:40,534", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "models.py"}
+{"timestamp": "2026-06-02 18:15:40,786", "level": "INFO", "logger": "agent.file_history", "message": "file_history_saved", "path": "models.py", "history_path": ".history/models.py/1780404340568.txt", "size": 297}
+{"timestamp": "2026-06-02 18:15:43,385", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "templates/index.html"}
+{"timestamp": "2026-06-02 18:15:43,637", "level": "INFO", "logger": "agent.file_history", "message": "file_history_saved", "path": "templates/index.html", "history_path": ".history/templates/index.html/1780404343417.txt", "size": 1204}
+{"timestamp": "2026-06-02 18:15:44,973", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "static/style.css"}
+{"timestamp": "2026-06-02 18:15:45,221", "level": "INFO", "logger": "agent.file_history", "message": "file_history_saved", "path": "static/style.css", "history_path": ".history/static/style.css/1780404345002.txt", "size": 417}
+{"timestamp": "2026-06-02 18:15:47,989", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "static/script.js"}
+{"timestamp": "2026-06-02 18:15:48,264", "level": "INFO", "logger": "agent.file_history", "message": "file_history_saved", "path": "static/script.js", "history_path": ".history/static/script.js/1780404348045.txt", "size": 1462}
+{"timestamp": "2026-06-02 18:15:49,138", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "write", "detail": "requirements.txt"}
+{"timestamp": "2026-06-02 18:15:49,432", "level": "INFO", "logger": "agent.file_history", "message": "file_history_saved", "path": "requirements.txt", "history_path": ".history/requirements.txt/1780404349213.txt", "size": 36}
+{"timestamp": "2026-06-02 18:15:50,387", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "run", "detail": "python3 -m pip install -r requirements.txt > dev_server.log 2>&1 &"}
+{"timestamp": "2026-06-02 18:15:50,957", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "run", "detail": "python3 app.py > app.log 2>&1 &"}
+{"timestamp": "2026-06-02 18:15:51,545", "level": "INFO", "logger": "agent.nodes", "message": "batch_action", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "idx": 1, "total": 1, "action": "finish", "detail": ""}
+{"timestamp": "2026-06-02 18:15:51,611", "level": "INFO", "logger": "agent.nodes", "message": "validation_run_compile_checks", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9"}
+{"timestamp": "2026-06-02 18:15:52,783", "level": "INFO", "logger": "agent.nodes", "message": "validation_waiting_for_port", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9"}
+{"timestamp": "2026-06-02 18:15:55,603", "level": "INFO", "logger": "agent.llm", "message": "groq_llm_created", "model": "groq/llama-3.3-70b-versatile", "role": "coder", "num_keys": 1, "mode": "single"}
+{"timestamp": "2026-06-02 18:15:55,619", "level": "INFO", "logger": "agent.error_analyzer", "message": "error_analyzed", "category": "import", "severity": "medium", "error_type": "ImportError", "file": "/workspace/app.py", "line": 1}
+{"timestamp": "2026-06-02 18:15:55,619", "level": "INFO", "logger": "agent.nodes", "message": "implement_with_error_analysis", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9", "category": "import", "severity": "medium"}
+{"timestamp": "2026-06-02 18:15:56,334", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 1}
+
+[1;31mGive Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new[0m
+LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
+
+{"timestamp": "2026-06-02 18:15:56,457", "level": "WARNING", "logger": "agent.groq_key_pool", "message": "groq_key_rate_limited", "key_suffix": "IRPR", "cooldown_seconds": 60.0, "consecutive_errors": 1}
+{"timestamp": "2026-06-02 18:15:56,457", "level": "WARNING", "logger": "agent.rate_limited_llm", "message": "groq_rate_limit_hit", "attempt": 1, "key_suffix": "...IRPR", "retry_after": 60.0, "remaining_keys": 0}
+{"timestamp": "2026-06-02 18:15:57,458", "level": "INFO", "logger": "agent.groq_key_pool", "message": "groq_all_keys_exhausted_waiting", "wait_seconds": 59.0, "pool_size": 1, "model": "groq/llama-3.3-70b-versatile"}
+{"timestamp": "2026-06-02 18:16:11,490", "level": "INFO", "logger": "routes.agent", "message": "ws_ping_timeout", "session_id": "af69a21f-12e2-4ddc-8765-65ffe5770fa9"}
+INFO:     connection closed
+{"timestamp": "2026-06-02 18:16:15,241", "level": "INFO", "logger": "routes.agent", "message": "session_created", "session_id": "0712e704-70c2-4ec4-bc61-05579ec2a4a2"}
+INFO:     127.0.0.1:42470 - "POST /api/agent/sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42484 - "WebSocket /api/agent/ws" [accepted]
+INFO:     connection open
+{"timestamp": "2026-06-02 18:16:15,371", "level": "INFO", "logger": "routes.agent", "message": "ws_session_start", "session_id": "0712e704-70c2-4ec4-bc61-05579ec2a4a2", "action": "start", "chat_mode": "build", "num_locked": 0}
+{"timestamp": "2026-06-02 18:16:15,452", "level": "INFO", "logger": "agent.llm", "message": "groq_llm_created", "model": "groq/llama-3.3-70b-versatile", "role": "planner", "num_keys": 1, "mode": "single"}
+{"timestamp": "2026-06-02 18:16:15,552", "level": "INFO", "logger": "runtime", "message": "container_auto_paused", "container": "agent-sandbox-86e361f7-1780403992"}
+{"timestamp": "2026-06-02 18:16:15,570", "level": "INFO", "logger": "runtime", "message": "container_start", "session_id": "0712e704-70c2-4ec4-bc61-05579ec2a4a2", "container": "agent-sandbox-0712e704-1780404375"}
+{"timestamp": "2026-06-02 18:16:17,456", "level": "INFO", "logger": "agent.groq_key_pool", "message": "groq_all_keys_exhausted_waiting", "wait_seconds": 39.0, "pool_size": 1, "model": "groq/llama-3.3-70b-versatile"}
+{"timestamp": "2026-06-02 18:16:56,458", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 0}
+{"timestamp": "2026-06-02 18:16:56,460", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 0}
+
+[1;31mGive Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new[0m
+LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
+
+{"timestamp": "2026-06-02 18:16:56,605", "level": "WARNING", "logger": "agent.groq_key_pool", "message": "groq_key_rate_limited", "key_suffix": "IRPR", "cooldown_seconds": 60.0, "consecutive_errors": 2}
+{"timestamp": "2026-06-02 18:16:56,606", "level": "WARNING", "logger": "agent.rate_limited_llm", "message": "groq_rate_limit_hit", "attempt": 2, "key_suffix": "...IRPR", "retry_after": 60.0, "remaining_keys": 0}
+{"timestamp": "2026-06-02 18:16:57,607", "level": "INFO", "logger": "agent.groq_key_pool", "message": "groq_all_keys_exhausted_waiting", "wait_seconds": 59.0, "pool_size": 1, "model": "groq/llama-3.3-70b-versatile"}
+{"timestamp": "2026-06-02 18:16:57,779", "level": "INFO", "logger": "agent.rate_limited_llm", "message": "groq_request_success", "attempt": 1, "key_suffix": "...IRPR", "model": "groq/llama-3.3-70b-versatile", "tokens_estimated": 1512}
+{"timestamp": "2026-06-02 18:16:57,792", "level": "INFO", "logger": "agent.research_node", "message": "research_start", "session_id": "0712e704-70c2-4ec4-bc61-05579ec2a4a2", "num_queries": 3, "queries": ["flask python project structure setup 2026", "flask sqlite integration setup python", "html_css_js flask full-stack project structure python 2026"]}
+{"timestamp": "2026-06-02 18:17:00,951", "level": "INFO", "logger": "agent.web_search", "message": "web_search_ok", "query": "flask python project structure setup 2026", "results": 2}
+{"timestamp": "2026-06-02 18:17:01,984", "level": "INFO", "logger": "agent.web_search", "message": "page_fetch_ok", "url": "https://muneebdev.com/flask-project-structure-best-practices/", "chars": 1517}
+{"timestamp": "2026-06-02 18:17:02,079", "level": "INFO", "logger": "agent.web_search", "message": "web_search_ok", "query": "html_css_js flask full-stack project structure python 2026", "results": 2}
+{"timestamp": "2026-06-02 18:17:02,451", "level": "INFO", "logger": "agent.web_search", "message": "page_fetch_ok", "url": "https://dev.to/cre8stevedev/building-a-full-stack-web-application-using-flask-python-web-framework-part-one-5b1i", "chars": 1517}
+{"timestamp": "2026-06-02 18:17:02,654", "level": "INFO", "logger": "agent.web_search", "message": "page_fetch_ok", "url": "https://stackoverflow.com/questions/14415500/common-folder-file-structure-in-flask-app", "chars": 1517}
+{"timestamp": "2026-06-02 18:17:03,399", "level": "INFO", "logger": "agent.web_search", "message": "web_search_ok", "query": "flask sqlite integration setup python", "results": 2}
+{"timestamp": "2026-06-02 18:17:03,731", "level": "INFO", "logger": "agent.web_search", "message": "page_fetch_ok", "url": "https://github.com/yasir-mrwt/flask-fullstack-structure", "chars": 1517}
+{"timestamp": "2026-06-02 18:17:03,833", "level": "INFO", "logger": "agent.web_search", "message": "page_fetch_ok", "url": "https://geekpython.in/connect-sqlite-database-with-flask-app", "chars": 1517}
+{"timestamp": "2026-06-02 18:17:04,007", "level": "INFO", "logger": "agent.web_search", "message": "page_fetch_ok", "url": "https://pytutorial.com/install-flask-sqlalchemy-in-python-quick-guide/", "chars": 1517}
+{"timestamp": "2026-06-02 18:17:04,008", "level": "INFO", "logger": "agent.llm", "message": "groq_llm_created", "model": "groq/llama-3.3-70b-versatile", "role": "validator", "num_keys": 1, "mode": "single"}
+{"timestamp": "2026-06-02 18:17:04,514", "level": "INFO", "logger": "agent.groq_key_pool", "message": "groq_all_keys_exhausted_waiting", "wait_seconds": 52.1, "pool_size": 1, "model": "groq/llama-3.3-70b-versatile"}
+INFO:     127.0.0.1:35940 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35940 - "GET /openapi.json HTTP/1.1" 200 OK
+{"timestamp": "2026-06-02 18:17:56,606", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 0}
+{"timestamp": "2026-06-02 18:17:56,608", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 0}
+
+[1;31mGive Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new[0m
+LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
+
+{"timestamp": "2026-06-02 18:17:56,698", "level": "WARNING", "logger": "agent.groq_key_pool", "message": "groq_key_rate_limited", "key_suffix": "IRPR", "cooldown_seconds": 2280.0, "consecutive_errors": 1}
+{"timestamp": "2026-06-02 18:17:56,698", "level": "WARNING", "logger": "agent.rate_limited_llm", "message": "groq_rate_limit_hit", "attempt": 1, "key_suffix": "...IRPR", "retry_after": 2280.0, "remaining_keys": 0}
+
+[1;31mGive Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new[0m
+LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
+
+{"timestamp": "2026-06-02 18:17:56,740", "level": "WARNING", "logger": "agent.groq_key_pool", "message": "groq_key_rate_limited", "key_suffix": "IRPR", "cooldown_seconds": 60.0, "consecutive_errors": 2}
+{"timestamp": "2026-06-02 18:17:56,740", "level": "WARNING", "logger": "agent.rate_limited_llm", "message": "groq_rate_limit_hit", "attempt": 3, "key_suffix": "...IRPR", "retry_after": 60.0, "remaining_keys": 0}
+{"timestamp": "2026-06-02 18:17:57,699", "level": "INFO", "logger": "agent.groq_key_pool", "message": "groq_all_keys_exhausted_waiting", "wait_seconds": 59.0, "pool_size": 1, "model": "groq/llama-3.3-70b-versatile"}
+{"timestamp": "2026-06-02 18:17:57,740", "level": "INFO", "logger": "agent.groq_key_pool", "message": "groq_all_keys_exhausted_waiting", "wait_seconds": 59.0, "pool_size": 1, "model": "groq/llama-3.3-70b-versatile"}
+{"timestamp": "2026-06-02 18:18:15,447", "level": "INFO", "logger": "routes.agent", "message": "ws_ping_timeout", "session_id": "0712e704-70c2-4ec4-bc61-05579ec2a4a2"}
+INFO:     connection closed
+{"timestamp": "2026-06-02 18:18:56,740", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 0}
+{"timestamp": "2026-06-02 18:18:56,742", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 0}
+
+[1;31mGive Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new[0m
+LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
+
+{"timestamp": "2026-06-02 18:18:56,841", "level": "WARNING", "logger": "agent.groq_key_pool", "message": "groq_key_rate_limited", "key_suffix": "IRPR", "cooldown_seconds": 1380.0, "consecutive_errors": 3}
+{"timestamp": "2026-06-02 18:18:56,841", "level": "WARNING", "logger": "agent.rate_limited_llm", "message": "groq_rate_limit_hit", "attempt": 2, "key_suffix": "...IRPR", "retry_after": 1380.0, "remaining_keys": 0}
+
+[1;31mGive Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new[0m
+LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
+
+{"timestamp": "2026-06-02 18:18:56,870", "level": "WARNING", "logger": "agent.groq_key_pool", "message": "groq_key_rate_limited", "key_suffix": "IRPR", "cooldown_seconds": 60.0, "consecutive_errors": 4}
+{"timestamp": "2026-06-02 18:18:56,870", "level": "WARNING", "logger": "agent.rate_limited_llm", "message": "groq_rate_limit_hit", "attempt": 4, "key_suffix": "...IRPR", "retry_after": 60.0, "remaining_keys": 0}
+{"timestamp": "2026-06-02 18:18:57,842", "level": "INFO", "logger": "agent.groq_key_pool", "message": "groq_all_keys_exhausted_waiting", "wait_seconds": 59.0, "pool_size": 1, "model": "groq/llama-3.3-70b-versatile"}
+{"timestamp": "2026-06-02 18:18:57,870", "level": "INFO", "logger": "agent.groq_key_pool", "message": "groq_all_keys_exhausted_waiting", "wait_seconds": 59.0, "pool_size": 1, "model": "groq/llama-3.3-70b-versatile"}
+{"timestamp": "2026-06-02 18:19:56,871", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 0}
+{"timestamp": "2026-06-02 18:19:56,872", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 0}
+
+[1;31mGive Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new[0m
+LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
+
+{"timestamp": "2026-06-02 18:19:56,963", "level": "WARNING", "logger": "agent.groq_key_pool", "message": "groq_key_rate_limited", "key_suffix": "IRPR", "cooldown_seconds": 1320.0, "consecutive_errors": 5}
+{"timestamp": "2026-06-02 18:19:56,964", "level": "WARNING", "logger": "agent.rate_limited_llm", "message": "groq_rate_limit_hit", "attempt": 3, "key_suffix": "...IRPR", "retry_after": 1320.0, "remaining_keys": 0}
+
+[1;31mGive Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new[0m
+LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
+
+{"timestamp": "2026-06-02 18:19:57,005", "level": "WARNING", "logger": "agent.groq_key_pool", "message": "groq_key_rate_limited", "key_suffix": "IRPR", "cooldown_seconds": 60.0, "consecutive_errors": 6}
+{"timestamp": "2026-06-02 18:19:57,006", "level": "WARNING", "logger": "agent.rate_limited_llm", "message": "groq_rate_limit_hit", "attempt": 5, "key_suffix": "...IRPR", "retry_after": 60.0, "remaining_keys": 0}
+{"timestamp": "2026-06-02 18:19:57,964", "level": "INFO", "logger": "agent.groq_key_pool", "message": "groq_all_keys_exhausted_waiting", "wait_seconds": 59.0, "pool_size": 1, "model": "groq/llama-3.3-70b-versatile"}
+{"timestamp": "2026-06-02 18:19:58,005", "level": "INFO", "logger": "agent.groq_key_pool", "message": "groq_all_keys_exhausted_waiting", "wait_seconds": 59.0, "pool_size": 1, "model": "groq/llama-3.3-70b-versatile"}
+{"timestamp": "2026-06-02 18:20:27,439", "level": "INFO", "logger": "routes.agent", "message": "session_created", "session_id": "3f01d867-f7b9-4ab7-8449-5dab1f221f51"}
+INFO:     127.0.0.1:54556 - "POST /api/agent/sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54562 - "WebSocket /api/agent/ws" [accepted]
+INFO:     connection open
+{"timestamp": "2026-06-02 18:20:27,579", "level": "INFO", "logger": "routes.agent", "message": "ws_session_start", "session_id": "3f01d867-f7b9-4ab7-8449-5dab1f221f51", "action": "start", "chat_mode": "build", "num_locked": 0}
+{"timestamp": "2026-06-02 18:20:27,662", "level": "INFO", "logger": "agent.llm", "message": "groq_llm_created", "model": "groq/llama-3.3-70b-versatile", "role": "planner", "num_keys": 1, "mode": "single"}
+{"timestamp": "2026-06-02 18:20:27,882", "level": "INFO", "logger": "runtime", "message": "container_auto_paused", "container": "agent-sandbox-76656b56-1780404011"}
+{"timestamp": "2026-06-02 18:20:27,897", "level": "INFO", "logger": "runtime", "message": "container_start", "session_id": "3f01d867-f7b9-4ab7-8449-5dab1f221f51", "container": "agent-sandbox-3f01d867-1780404627"}
+{"timestamp": "2026-06-02 18:20:29,745", "level": "INFO", "logger": "agent.groq_key_pool", "message": "groq_all_keys_exhausted_waiting", "wait_seconds": 27.3, "pool_size": 1, "model": "groq/llama-3.3-70b-versatile"}
+{"timestamp": "2026-06-02 18:20:57,006", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 0}
+{"timestamp": "2026-06-02 18:20:57,007", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 0}
+{"timestamp": "2026-06-02 18:20:57,010", "level": "DEBUG", "logger": "agent.groq_key_pool", "message": "groq_key_acquired", "key_suffix": "...IRPR", "minute_requests": 0}
+
+[1;31mGive Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new[0m
+LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
+
+{"timestamp": "2026-06-02 18:20:57,552", "level": "WARNING", "logger": "agent.groq_key_pool", "message": "groq_key_rate_limited", "key_suffix": "IRPR", "cooldown_seconds": 60.0, "consecutive_errors": 7}
+{"timestamp": "2026-06-02 18:20:57,552", "level": "WARNING", "logger": "agent.rate_limited_llm", "message": "groq_rate_limit_hit", "attempt": 6, "key_suffix": "...IRPR", "retry_after": 60.0, "remaining_keys": 0}
+{"timestamp": "2026-06-02 18:20:58,552", "level": "INFO", "logger": "agent.groq_key_pool", "message": "groq_all_keys_exhausted_waiting", "wait_seconds": 59.0, "pool_size": 1, "model": "groq/llama-3.3-70b-versatile"}
+INFO:     connection closed
+INFO:     Shutting down
+INFO:     Waiting for background tasks to complete. (CTRL+C to force quit)

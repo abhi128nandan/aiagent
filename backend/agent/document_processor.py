@@ -107,62 +107,76 @@ class DocumentParser:
         return doc
 
     def _parse_pdf(self, file_path: str, doc: ParsedDocument) -> None:
-        """Parse PDF using PyMuPDF (fitz)."""
+        """Parse PDF using MarkItDown, with fallback to PyMuPDF (fitz) or pdfplumber."""
         try:
-            import fitz  # PyMuPDF
+            from markitdown import MarkItDown
 
-            pdf = fitz.open(file_path)
-            doc.metadata = {
-                "title": pdf.metadata.get("title", ""),
-                "author": pdf.metadata.get("author", ""),
-                "pages": len(pdf),
-            }
+            md = MarkItDown()
+            result = md.convert(file_path)
+            doc.text = result.text_content
+            doc.metadata = {"file_type": "pdf", "parser": "markitdown"}
+            return
 
-            pages_text = []
-            for page_num, page in enumerate(pdf, 1):
-                text = page.get_text("text")
-                pages_text.append(text)
-
-                # Extract tables (basic heuristic: detect tabular content)
-                blocks = page.get_text("blocks")
-                for block in blocks:
-                    if block[6] == 0:  # Text block
-                        text_block = block[4]
-                        if "\t" in text_block or "  |  " in text_block:
-                            rows = [
-                                [cell.strip() for cell in row.split("\t") if cell.strip()]
-                                for row in text_block.split("\n")
-                                if row.strip()
-                            ]
-                            if len(rows) > 1 and all(len(r) > 1 for r in rows):
-                                doc.tables.append(rows)
-
-            doc.text = "\n\n".join(pages_text)
-            pdf.close()
-
-        except ImportError:
-            logger.warning("pymupdf_not_installed", fallback="text_extraction")
-            # Fallback: try pdfplumber
+        except Exception as e:
+            logger.warning("markitdown_parsing_failed", error=str(e), fallback="pymupdf")
+            # Fallback to PyMuPDF
             try:
-                import pdfplumber
+                import fitz  # PyMuPDF
 
-                with pdfplumber.open(file_path) as pdf:
-                    pages_text = []
-                    for page in pdf.pages:
-                        text = page.extract_text() or ""
-                        pages_text.append(text)
+                pdf = fitz.open(file_path)
+                doc.metadata = {
+                    "title": pdf.metadata.get("title", ""),
+                    "author": pdf.metadata.get("author", ""),
+                    "pages": len(pdf),
+                    "parser": "pymupdf",
+                }
 
-                        tables = page.extract_tables()
-                        doc.tables.extend(tables)
+                pages_text = []
+                for page_num in range(1, len(pdf) + 1):
+                    page = pdf[page_num - 1]
+                    text = page.get_text("text")
+                    pages_text.append(text)
 
-                    doc.text = "\n\n".join(pages_text)
-                    doc.metadata = {"pages": len(pdf.pages)}
+                    # Extract tables (basic heuristic: detect tabular content)
+                    blocks = page.get_text("blocks")
+                    for block in blocks:
+                        if block[6] == 0:  # Text block
+                            text_block = block[4]
+                            if "\t" in text_block or "  |  " in text_block:
+                                rows = [
+                                    [cell.strip() for cell in row.split("\t") if cell.strip()]
+                                    for row in text_block.split("\n")
+                                    if row.strip()
+                                ]
+                                if len(rows) > 1 and all(len(r) > 1 for r in rows):
+                                    doc.tables.append(rows)
+
+                doc.text = "\n\n".join(pages_text)
+                pdf.close()
 
             except ImportError:
-                raise ImportError(
-                    "Neither PyMuPDF (fitz) nor pdfplumber is installed. "
-                    "Install one: pip install pymupdf pdfplumber"
-                )
+                logger.warning("pymupdf_not_installed", fallback="pdfplumber")
+                # Fallback: try pdfplumber
+                try:
+                    import pdfplumber
+
+                    with pdfplumber.open(file_path) as pdf:
+                        pages_text = []
+                        for page in pdf.pages:
+                            text = page.extract_text() or ""
+                            pages_text.append(text)
+
+                            tables = page.extract_tables()
+                            doc.tables.extend(tables)
+
+                        doc.text = "\n\n".join(pages_text)
+                        doc.metadata = {"pages": len(pdf.pages), "parser": "pdfplumber"}
+
+                except ImportError:
+                    raise ImportError(
+                        "MarkItDown, PyMuPDF (fitz) and pdfplumber are not installed. "
+                        "Install one: pip install markitdown pymupdf pdfplumber"
+                    )
 
     def _parse_docx(self, file_path: str, doc: ParsedDocument) -> None:
         """Parse DOCX using docx2txt."""
@@ -196,7 +210,9 @@ class DocumentParser:
                 }
                 doc.sections.append(current_section)
             elif current_section is not None:
-                current_section["content"].append(line)
+                content_list = current_section["content"]
+                if isinstance(content_list, list):
+                    content_list.append(line)
 
     def _parse_text(self, file_path: str, doc: ParsedDocument) -> None:
         """Parse plain text file."""
@@ -253,7 +269,7 @@ class DocumentParser:
             sections.append({
                 "title": title,
                 "level": max(1, level),
-                "content": content[:2000],  # Limit content size
+                "content": content,  # Limit removed to prevent data loss
             })
 
         return sections
@@ -282,7 +298,7 @@ class SemanticChunker:
         " ",         # Word boundary
     ]
 
-    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200):
+    def __init__(self, chunk_size: int = 3000, chunk_overlap: int = 400):
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
 
@@ -290,23 +306,65 @@ class SemanticChunker:
         """
         Chunk a parsed document into semantically meaningful pieces.
 
-        If the document has sections, chunk within sections first.
-        Otherwise, chunk the full text.
+        Uses LangChain's MarkdownHeaderTextSplitter to preserve hierarchy,
+        followed by RecursiveCharacterTextSplitter to enforce chunk sizes.
         """
         chunks = []
 
-        if doc.sections:
-            chunks = self._chunk_by_sections(doc)
-        else:
-            chunks = self._chunk_text(
-                doc.text,
-                metadata={
-                    "source": os.path.basename(doc.source_file),
-                    "file_type": doc.file_type,
-                },
+        try:
+            from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
+
+            headers_to_split_on = [
+                ("#", "Header 1"),
+                ("##", "Header 2"),
+                ("###", "Header 3"),
+                ("####", "Header 4"),
+                ("#####", "Header 5"),
+                ("######", "Header 6"),
+            ]
+
+            # Split by headers to preserve metadata
+            md_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on)
+            md_splits = md_splitter.split_text(doc.text)
+
+            # Split large chunks using character rules
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=self.chunk_size,
+                chunk_overlap=self.chunk_overlap,
+                separators=self.SEPARATORS,
             )
 
-        doc.chunks = chunks
+            langchain_chunks = text_splitter.split_documents(md_splits)
+
+            for i, chunk in enumerate(langchain_chunks):
+                metadata = chunk.metadata.copy()
+                metadata["source"] = os.path.basename(doc.source_file)
+                metadata["file_type"] = doc.file_type
+                metadata["chunk_size"] = len(chunk.page_content)
+                metadata["position"] = "start" if i == 0 else "end" if i == len(langchain_chunks) - 1 else "middle"
+
+                doc_chunk = DocumentChunk(
+                    text=chunk.page_content,
+                    chunk_index=i,
+                    metadata=metadata
+                )
+                chunks.append(doc_chunk)
+
+            doc.chunks = chunks
+
+        except ImportError:
+            logger.warning("langchain_text_splitters_missing", fallback="custom_chunker")
+            if doc.sections:
+                chunks = self._chunk_by_sections(doc)
+            else:
+                chunks = self._chunk_text(
+                    doc.text,
+                    metadata={
+                        "source": os.path.basename(doc.source_file),
+                        "file_type": doc.file_type,
+                    },
+                )
+            doc.chunks = chunks
 
         logger.info(
             "document_chunked",

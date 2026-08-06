@@ -6,6 +6,7 @@ Architecture (from AUTONOMOUS_AI_AGENT_ARCHITECTURE.md §4):
   - Budget-based allocation across system prompt, tools, workspace, conversation
   - Intelligent truncation: keeps recent messages, summarizes older ones
   - Model-aware limits for small-context local models (8K Ollama)
+  - Overflow handling for extreme cases when standard pruning fails
 """
 from __future__ import annotations
 
@@ -41,8 +42,8 @@ MODEL_CONTEXT_LIMITS: Dict[str, int] = {
     "claude-3-5-sonnet-20241022": 200_000,
     "claude-3-opus-20240229": 200_000,
     # Groq / cloud models
-    "groq/llama-3.3-70b-versatile": 128_000,
-    "llama-3.3-70b-versatile": 128_000,
+    "groq/llama-3.3-70b-versatile": 12_000,
+    "llama-3.3-70b-versatile": 12_000,
     "groq/llama-3.1-8b-instant": 128_000,
     "llama-3.1-8b-instant": 128_000,
     "groq/llama3-8b-8192": 8_192,
@@ -98,6 +99,31 @@ def count_tokens(text: str, model: Optional[str] = None) -> int:
     return max(1, len(text) // 4)
 
 
+def truncate_text_tokens(text: str, max_tokens: int, keep: str = "head") -> str:
+    """
+    Trim a text block to fit a token budget.
+
+    keep='head'   → keep the beginning (plans, requirements)
+    keep='tail'   → keep the end (error logs — the failure is at the bottom)
+    keep='middle' → keep beginning and end, drop the middle
+    """
+    if not text:
+        return text
+    tokens = count_tokens(text)
+    if tokens <= max_tokens:
+        return text
+
+    # Scale chars proportionally to the actual token density of this text
+    max_chars = max(200, int(len(text) * (max_tokens / tokens) * 0.92))
+
+    if keep == "tail":
+        return "...[truncated]...\n" + text[-max_chars:]
+    if keep == "middle":
+        half = max_chars // 2
+        return text[:half] + "\n...[truncated]...\n" + text[-half:]
+    return text[:max_chars] + "\n...[truncated]"
+
+
 def count_message_tokens(messages: List[BaseMessage], model: Optional[str] = None) -> int:
     """Count total tokens across a list of LangChain messages."""
     total = 0
@@ -120,7 +146,8 @@ class TokenBudget:
         # Fixed allocations
         self.system_prompt = 1_000
         self.tools = 1_500
-        self.response_buffer = min(2_000, self.max_tokens // 4)
+        # Code generation emits whole files — reserve real room for output
+        self.response_buffer = min(3_000, self.max_tokens // 4)
 
         # Dynamic allocations (remaining budget)
         self._remaining = self.max_tokens - self.system_prompt - self.tools - self.response_buffer
@@ -133,7 +160,7 @@ class TokenBudget:
         if model in MODEL_CONTEXT_LIMITS:
             return MODEL_CONTEXT_LIMITS[model]
 
-        # Partial match (e.g., "ollama/qwen2.5-coder:32b" → "qwen2.5-coder:32b")
+        # Partial match (e.g., "ollama/mistral:7b" → "qwen2.5-coder:32b")
         clean = model.split("/")[-1] if "/" in model else model
         if clean in MODEL_CONTEXT_LIMITS:
             return MODEL_CONTEXT_LIMITS[clean]
@@ -165,6 +192,51 @@ class TokenBudget:
         }
 
 
+# ── Message compaction ─────────────────────────────────────────────────
+# Old AI messages carry full <write>/<replace> bodies. Once executed, the
+# file content lives on disk and is re-injected via workspace context, so
+# the history only needs to remember WHICH files were touched.
+
+_WRITE_BODY_RE = re.compile(
+    r"(<write\s+path=['\"]([^'\"]+)['\"][^>]*>)([\s\S]*?)(</write>)", re.IGNORECASE
+)
+_REPLACE_BODY_RE = re.compile(
+    r"(<replace\s+path=['\"]([^'\"]+)['\"][^>]*>)([\s\S]*?)(</replace>)", re.IGNORECASE
+)
+_OBSERVATION_MAX_CHARS = 1_500
+
+
+def compact_message_content(content: str) -> str:
+    """Strip bulky action bodies / observation logs while keeping the facts."""
+    if not content:
+        return content
+
+    def _strip_body(match: "re.Match[str]") -> str:
+        body = match.group(3)
+        if len(body) < 200:
+            return match.group(0)
+        return f"{match.group(1)}[content applied to {match.group(2)} — current version is in workspace context]{match.group(4)}"
+
+    content = _WRITE_BODY_RE.sub(_strip_body, content)
+    content = _REPLACE_BODY_RE.sub(_strip_body, content)
+
+    # Long observation outputs: keep the head (command/exit code) and tail (the error)
+    if content.lstrip().startswith("Observation") and len(content) > _OBSERVATION_MAX_CHARS:
+        content = content[:500] + "\n...[output compacted]...\n" + content[-800:]
+
+    return content
+
+
+def _rebuild_message(msg: BaseMessage, content: str) -> BaseMessage:
+    if isinstance(msg, HumanMessage):
+        return HumanMessage(content=content)
+    if isinstance(msg, AIMessage):
+        return AIMessage(content=content)
+    if isinstance(msg, SystemMessage):
+        return SystemMessage(content=content)
+    return msg
+
+
 # ── Context Manager ────────────────────────────────────────────────────
 
 class ContextManager:
@@ -186,7 +258,7 @@ class ContextManager:
         messages: List[BaseMessage],
         *,
         keep_first: int = 1,
-        keep_last: int = 10,
+        keep_last: int = 6,
         max_tokens: Optional[int] = None,
     ) -> List[BaseMessage]:
         """
@@ -197,11 +269,39 @@ class ContextManager:
           2. Always keep the last `keep_last` messages (recent context)
           3. Summarize everything in between into a single system message
           4. If still over budget, progressively reduce `keep_last`
+          5. If keep_last <= 3 and still over budget, trigger overflow handling
         """
         budget = max_tokens or self.budget.available_for_conversation
+        
+        # Track original metrics for logging
+        original_tokens = count_message_tokens(messages)
+        messages_before = len(messages)
 
-        if count_message_tokens(messages) <= budget:
+        if original_tokens <= budget:
             return messages  # Everything fits
+
+        # Stage 1: compact bulky action bodies in all but the 2 most recent
+        # messages. This loses no decisions — only file bodies that already
+        # live in the workspace — so try it before summarizing anything.
+        compacted = [
+            msg if i >= len(messages) - 2 else _rebuild_message(
+                msg,
+                compact_message_content(
+                    msg.content if isinstance(msg.content, str) else str(msg.content)
+                ),
+            )
+            for i, msg in enumerate(messages)
+        ]
+        compacted_tokens = count_message_tokens(compacted)
+        if compacted_tokens <= budget:
+            logger.info(
+                "context_compacted",
+                original_tokens=original_tokens,
+                compacted_tokens=compacted_tokens,
+                reduction_pct=round((1 - compacted_tokens / original_tokens) * 100, 1),
+            )
+            return compacted
+        messages = compacted  # keep pruning on the compacted history
 
         if len(messages) <= keep_first + keep_last:
             # Can't split further — just truncate individual messages
@@ -221,11 +321,18 @@ class ContextManager:
         pruned = first_msgs + [summary_msg] + last_msgs
 
         # Check if we fit now
-        if count_message_tokens(pruned) <= budget:
+        pruned_tokens = count_message_tokens(pruned)
+        if pruned_tokens <= budget:
+            messages_after = len(pruned)
+            reduction_pct = round((1 - pruned_tokens / original_tokens) * 100, 1) if original_tokens > 0 else 0
+            
             logger.info(
                 "context_pruned",
-                original=len(messages),
-                pruned_to=len(pruned),
+                original_tokens=original_tokens,
+                pruned_tokens=pruned_tokens,
+                reduction_pct=reduction_pct,
+                messages_before=messages_before,
+                messages_after=messages_after,
                 summarized=len(middle_msgs),
             )
             return pruned
@@ -239,8 +346,24 @@ class ContextManager:
                 max_tokens=budget,
             )
 
-        # Last resort: hard truncate
-        return self._truncate_long_messages(pruned, budget)
+        # Overflow handling: standard pruning has failed (keep_last <= 3 and still over budget)
+        logger.warning(
+            "context_overflow_detected",
+            keep_last=keep_last,
+            pruned_tokens=count_message_tokens(pruned),
+            budget=budget,
+            strategy="aggressive_prune"
+        )
+        
+        # Import here to avoid circular import
+        from agent.overflow_handler import handle_overflow
+        
+        # Call overflow handler with aggressive_prune strategy
+        return handle_overflow(
+            messages=messages,
+            budget=budget,
+            strategy="aggressive_prune"
+        )
 
     def _summarize_messages(self, messages: List[BaseMessage]) -> str:
         """
@@ -314,6 +437,68 @@ class ContextManager:
                 truncated.append(msg)
 
         return truncated
+
+    def fit_request(
+        self,
+        *,
+        messages: Optional[List[BaseMessage]] = None,
+        components: Optional[Dict[str, Dict]] = None,
+        system_text: str = "",
+        template_overhead: int = 300,
+    ) -> Dict:
+        """
+        Budget the ENTIRE request — system prompt + every prompt component +
+        message history — so the total stays under the model's context limit.
+
+        components: {name: {"text": str, "share": float, "keep": "head|tail|middle"}}
+          `share` is the max fraction of the post-system budget that component
+          may occupy. Components smaller than their share donate the unused
+          space to the message history.
+
+        Returns {"components": {name: fitted_text}, "messages": pruned,
+                 "stats": {...}} ready to feed straight into the prompt.
+        """
+        components = components or {}
+        messages = messages or []
+
+        available = self.budget.max_tokens - self.budget.response_buffer
+        available -= count_tokens(system_text) + template_overhead
+
+        fitted: Dict[str, str] = {}
+        used = 0
+        for name, spec in components.items():
+            cap = max(150, int(available * spec.get("share", 0.10)))
+            raw = spec.get("text") or ""
+            if not isinstance(raw, str):
+                raw = str(raw)
+            text = truncate_text_tokens(raw, cap, keep=spec.get("keep", "head"))
+            fitted[name] = text
+            used += count_tokens(text)
+
+        msg_budget = max(800, available - used)
+        pruned = self.prune_messages(messages, max_tokens=msg_budget) if messages else []
+
+        total = (
+            used
+            + count_message_tokens(pruned)
+            + count_tokens(system_text)
+            + template_overhead
+        )
+        stats = {
+            "model": self.budget.model,
+            "max_tokens": self.budget.max_tokens,
+            "request_tokens": total,
+            "component_tokens": used,
+            "message_tokens": count_message_tokens(pruned),
+            "message_budget": msg_budget,
+            "response_buffer": self.budget.response_buffer,
+            "over_limit": total > self.budget.max_tokens - self.budget.response_buffer,
+        }
+        if stats["over_limit"]:
+            logger.warning("fit_request_still_over_limit", **stats)
+        else:
+            logger.info("fit_request_ok", request_tokens=total, max_tokens=self.budget.max_tokens)
+        return {"components": fitted, "messages": pruned, "stats": stats}
 
     def get_context_stats(self, messages: List[BaseMessage]) -> dict:
         """Return diagnostic stats about current context usage."""

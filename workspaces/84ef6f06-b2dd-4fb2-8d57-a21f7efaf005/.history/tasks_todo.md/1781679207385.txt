@@ -1,0 +1,112 @@
+# Project: to-do-web-application
+
+## Description
+A web application for creating, organizing, tracking, and completing tasks.
+
+## Tasks Checklist
+
+- [ ] **RUN** `backend`
+  *Description:* Create the backend directory and navigate into it to initialize the Node.js project. This command will be executed from the project root.
+
+- [ ] **CREATE** `backend/package.json`
+  *Description:* Create the package.json file for the backend. Initialize a Node.js project with default settings and add necessary dependencies: express for the web framework, pg for PostgreSQL client, dotenv for environment variables, bcryptjs for password hashing, jsonwebtoken for authentication tokens, and cors for cross-origin resource sharing. Also add a start script.
+
+- [ ] **RUN** `backend`
+  *Description:* Install the backend dependencies listed in package.json. This command will be executed from the 'backend' directory.
+
+- [ ] **CREATE** `backend/server.js`
+  *Description:* Create the main entry point for the backend server. This file will load environment variables using `dotenv`, import the Express application from `src/app.js`, and start the server on the configured port (defaulting to 3001).
+
+- [ ] **CREATE** `backend/.env`
+  *Description:* Create the environment variables file for the backend. Define `PORT` for the server, `DB_USER`, `DB_HOST`, `DB_NAME`, `DB_PASSWORD`, `DB_PORT` for PostgreSQL connection, and `JWT_SECRET` for signing authentication tokens. These values should be replaced with actual database credentials and a strong secret.
+
+- [ ] **CREATE** `backend/.gitignore`
+  *Description:* Create a .gitignore file for the backend to exclude node_modules and the .env file from version control.
+
+- [ ] **CREATE** `backend/src/app.js`
+  *Description:* Create the main Express application configuration file. This file will set up middleware for JSON body parsing and CORS, define a basic root route, and mount the authentication and task API routes.
+
+- [ ] **CREATE** `backend/src/config/db.js`
+  *Description:* Create the database configuration file. This module will establish a connection pool to PostgreSQL using `pg` and environment variables. It will export a `query` function for executing SQL queries.
+
+- [ ] **CREATE** `backend/src/models/init.sql`
+  *Description:* Create an SQL script for initializing the database schema. This script will define `users` table (id, email, password_hash, created_at) and `tasks` table (id, user_id, title, description, due_date, priority, status, created_at, updated_at). It will include foreign key constraints and indexes.
+
+- [ ] **CREATE** `backend/src/models/userModel.js`
+  *Description:* Create the user model. This module will contain functions for interacting with the `users` table, including `createUser(email, passwordHash)`, `findUserByEmail(email)`, and `findUserById(id)`.
+
+- [ ] **CREATE** `backend/src/models/taskModel.js`
+  *Description:* Create the task model. This module will contain functions for interacting with the `tasks` table, including `createTask(userId, title, description, dueDate, priority, status)`, `getTasksByUserId(userId, filters)`, `getTaskById(taskId, userId)`, `updateTask(taskId, userId, updates)`, and `deleteTask(taskId, userId)`.
+
+- [ ] **CREATE** `backend/src/controllers/authController.js`
+  *Description:* Create the authentication controller. This module will implement the logic for `registerUser` (hashing password, creating user, generating JWT) and `loginUser` (comparing password, generating JWT).
+
+- [ ] **CREATE** `backend/src/controllers/taskController.js`
+  *Description:* Create the task controller. This module will implement the logic for `createTask`, `getTasks`, `getTaskById`, `updateTask`, and `deleteTask`, ensuring tasks are associated with the authenticated user.
+
+- [ ] **CREATE** `backend/src/routes/authRoutes.js`
+  *Description:* Create the authentication routes. This module will define API endpoints for `/api/auth/register` and `/api/auth/login`, mapping them to the respective controller functions.
+
+- [ ] **CREATE** `backend/src/routes/taskRoutes.js`
+  *Description:* Create the task routes. This module will define API endpoints for `/api/tasks` (GET, POST) and `/api/tasks/:id` (GET, PUT, DELETE), applying the `authMiddleware` to protect these routes.
+
+- [ ] **CREATE** `backend/src/middleware/authMiddleware.js`
+  *Description:* Create the authentication middleware. This module will contain a function `verifyToken` that extracts and verifies a JWT from the request header, attaching the `userId` to the request object if valid, or returning a 401 error.
+
+- [ ] **CREATE** `backend/src/utils/jwt.js`
+  *Description:* Create a utility module for JSON Web Token (JWT) operations. This module will export functions for `generateToken(payload)` using `jsonwebtoken` and the `JWT_SECRET` from environment variables.
+
+- [ ] **CREATE** `backend/src/utils/bcrypt.js`
+  *Description:* Create a utility module for password hashing. This module will export functions for `hashPassword(password)` and `comparePassword(password, hash)` using `bcryptjs`.
+
+- [ ] **MODIFY** `package.json`
+  *Description:* Add `react-router-dom` for client-side routing and `axios` for making HTTP requests to the backend. Also add `@types/react-router-dom` and `@types/axios` for TypeScript support.
+
+- [ ] **MODIFY** `src/main.tsx`
+  *Description:* Wrap the `App` component with `BrowserRouter` from `react-router-dom` to enable routing. Also, wrap it with `AuthContextProvider` to provide authentication state globally.
+
+- [ ] **MODIFY** `src/App.tsx`
+  *Description:* Remove the default Vite/React boilerplate content. Implement the main application layout using `react-router-dom`'s `Routes`. Define public routes for Login and Register, and private routes for the Dashboard and other authenticated views, protected by a `PrivateRoute` component. Include the `Navbar` component.
+
+- [ ] **CREATE** `src/context/AuthContext.tsx`
+  *Description:* Create a React Context for managing user authentication state. This context will provide `user` (User | null), `token` (string | null), `login` (function), `register` (function), and `logout` (function) to its consumers. It will handle storing/retrieving tokens from local storage.
+
+- [ ] **CREATE** `src/components/auth/Login.tsx`
+  *Description:* Create the Login component. This component will render a form with email and password fields. It will use the `AuthContext`'s `login` function to authenticate the user and redirect to the dashboard on success.
+
+- [ ] **CREATE** `src/components/auth/Register.tsx`
+  *Description:* Create the Register component. This component will render a form with email and password fields. It will use the `AuthContext`'s `register` function to create a new user account and redirect to the login page on success.
+
+- [ ] **CREATE** `src/components/common/Navbar.tsx`
+  *Description:* Create a responsive navigation bar component. It will display the application title, and conditionally show 'Login', 'Register', or 'Logout' links based on the user's authentication status from `AuthContext`.
+
+- [ ] **CREATE** `src/components/tasks/Dashboard.tsx`
+  *Description:* Create the Dashboard component. This will be the main authenticated view. It will display a summary of tasks (e.g., 'Due Today', 'Upcoming', 'Completed'), a `TaskForm` for new tasks, and a `TaskList` to display all tasks with filtering and sorting options.
+
+- [ ] **CREATE** `src/components/tasks/TaskList.tsx`
+  *Description:* Create the TaskList component. This component will receive an array of tasks as props and render each task using the `TaskItem` component. It will also handle filtering and sorting logic based on user input.
+
+- [ ] **CREATE** `src/components/tasks/TaskItem.tsx`
+  *Description:* Create the TaskItem component. This component will display a single task's details (title, description, due date, priority, status). It will include buttons for marking as complete, editing, and deleting the task, interacting with the task API.
+
+- [ ] **CREATE** `src/components/tasks/TaskForm.tsx`
+  *Description:* Create the TaskForm component. This component will render a form for creating or editing a task. It will include fields for title, description, due date, priority (low, medium, high), and status. It will handle form submission and interact with the task API.
+
+- [ ] **CREATE** `src/components/routing/PrivateRoute.tsx`
+  *Description:* Create a PrivateRoute component. This component will check if a user is authenticated using `AuthContext`. If not, it will redirect the user to the login page. Otherwise, it will render the child components.
+
+- [ ] **CREATE** `src/api/auth.ts`
+  *Description:* Create an API service for authentication. This module will contain functions like `register(email, password)` and `login(email, password)` that make HTTP requests to the backend authentication endpoints using `axios`.
+
+- [ ] **CREATE** `src/api/tasks.ts`
+  *Description:* Create an API service for tasks. This module will contain functions for `createTask`, `getTasks`, `getTaskById`, `updateTask`, and `deleteTask`, making authenticated HTTP requests to the backend task endpoints using `axios`.
+
+- [ ] **CREATE** `src/utils/constants.ts`
+  *Description:* Create a utility file for application constants. Define `API_BASE_URL` pointing to the backend server (e.g., `http://localhost:3001/api`).
+
+- [ ] **MODIFY** `src/index.css`
+  *Description:* Replace the default Vite global styles with basic application-wide CSS, including a reset, font definitions, and primary color variables. Ensure a clean base for styling.
+
+- [ ] **MODIFY** `src/App.css`
+  *Description:* Remove the default Vite App.css content. Add basic layout styles for the main application container, navigation, and content areas. Include responsive design considerations for desktop and mobile views.
+

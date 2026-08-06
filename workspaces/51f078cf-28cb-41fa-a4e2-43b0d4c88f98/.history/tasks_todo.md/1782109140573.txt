@@ -1,0 +1,58 @@
+# Project: ERP Management System
+
+## Description
+An ERP system integrating HR, Finance, Inventory, Sales, Procurement, and Reporting.
+
+## Tasks Checklist
+
+- [ ] **MODIFY** `package.json`
+  *Description:* Add `react-router-dom` to the dependencies for client-side routing. This package is essential for navigating between different modules of the ERP system without full page reloads.
+
+- [ ] **MODIFY** `vite.config.ts`
+  *Description:* Configure the Vite development server to run on port 3000 and be accessible from all network interfaces. This aligns with the project's `run_command` and ensures the frontend is reachable.
+
+- [ ] **MODIFY** `src/index.css`
+  *Description:* Replace the default Vite/React boilerplate styles with global CSS for the ERP system. This includes a CSS reset, defining color variables, basic typography, and foundational layout styles for the entire application, such as flexbox for the main layout.
+
+- [ ] **MODIFY** `src/App.css`
+  *Description:* Clear the existing boilerplate styles in `App.css`. All application-specific styles will be managed through `src/index.css` for global styles and component-specific CSS modules or inline styles as needed.
+
+- [ ] **MODIFY** `src/main.tsx`
+  *Description:* Import `BrowserRouter` from `react-router-dom` and wrap the `<App />` component with it. This sets up the routing context for the entire application, enabling navigation between different pages/modules.
+
+- [ ] **MODIFY** `src/App.tsx`
+  *Description:* Remove the default Vite/React boilerplate content. Implement the main application structure using `react-router-dom`'s `Routes` and `Route` components. This will define the entry points for the main layout, dashboard, and all ERP modules (Employee, Inventory, Procurement, Sales, Finance, Reporting, and Authentication). The `Layout` component will wrap the module-specific routes.
+
+- [ ] **CREATE** `src/components/Layout.tsx`
+  *Description:* Create a `Layout` functional component that provides the overall structure for the ERP application. It will include a `Navbar` (top bar), a `Sidebar` (left navigation), and a main content area (`Outlet` from `react-router-dom`) where module-specific pages will be rendered. This ensures a consistent UI across the application.
+
+- [ ] **CREATE** `src/components/Navbar.tsx`
+  *Description:* Create a `Navbar` functional component for the top navigation bar. This component will typically contain the ERP system's logo/name, potentially user-related information (e.g., logged-in user's name), and a logout button. It will be a static component within the `Layout`.
+
+- [ ] **CREATE** `src/components/Sidebar.tsx`
+  *Description:* Create a `Sidebar` functional component for the left-hand navigation menu. This component will list all the main ERP modules (Dashboard, Employee Management, Inventory Management, Procurement Management, Sales Management, Finance Management, Reporting Dashboard) as `NavLink` items from `react-router-dom`, allowing users to navigate between them.
+
+- [ ] **CREATE** `src/pages/Dashboard.tsx`
+  *Description:* Create a `Dashboard` functional component. This will serve as the main landing page after login, providing an overview or quick access to key information across different ERP modules. Initially, it will contain a placeholder message.
+
+- [ ] **CREATE** `src/pages/EmployeeManagement.tsx`
+  *Description:* Create an `EmployeeManagement` functional component. This page will be dedicated to managing employee records, including adding, viewing, editing, and deleting employee information. Initially, it will contain a placeholder message.
+
+- [ ] **CREATE** `src/pages/InventoryManagement.tsx`
+  *Description:* Create an `InventoryManagement` functional component. This page will handle product inventory, including stock levels, product details, and inventory movements. Initially, it will contain a placeholder message.
+
+- [ ] **CREATE** `src/pages/ProcurementManagement.tsx`
+  *Description:* Create a `ProcurementManagement` functional component. This page will manage purchasing processes, vendor information, and purchase orders. Initially, it will contain a placeholder message.
+
+- [ ] **CREATE** `src/pages/SalesManagement.tsx`
+  *Description:* Create a `SalesManagement` functional component. This page will manage sales orders, customer information, and sales-related activities. Initially, it will contain a placeholder message.
+
+- [ ] **CREATE** `src/pages/FinanceManagement.tsx`
+  *Description:* Create a `FinanceManagement` functional component. This page will cover financial operations, including accounts, transactions, and reporting. Initially, it will contain a placeholder message.
+
+- [ ] **CREATE** `src/pages/ReportingDashboard.tsx`
+  *Description:* Create a `ReportingDashboard` functional component. This page will display various reports and analytics generated from the ERP data. Initially, it will contain a placeholder message.
+
+- [ ] **CREATE** `src/pages/Auth.tsx`
+  *Description:* Create an `Auth` functional component. This page will handle user authentication, including login and potentially registration forms. It will be a standalone route, not wrapped by the main `Layout`.
+

@@ -9,7 +9,6 @@ import asyncio
 import random
 from typing import Optional, List, Any
 
-from langchain_community.chat_models import ChatLiteLLM
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.callbacks import CallbackManagerForLLMRun, AsyncCallbackManagerForLLMRun
 from langchain_core.messages import BaseMessage, AIMessage
@@ -41,20 +40,58 @@ class LLMFactory:
         provider = provider or settings.DEFAULT_LLM_PROVIDER
 
         if provider == "groq":
-            return self._create_groq(model_name, temperature, max_tokens, role)
-        if provider == "ollama":
-            return self._create_ollama(model_name, temperature, max_tokens, role)
-        if provider == "anthropic":
-            return self._create_anthropic(model_name, temperature, max_tokens)
-        if provider == "openai":
-            return self._create_openai(model_name, temperature, max_tokens)
-        if provider == "gemini":
-            return self._create_gemini(model_name, temperature, max_tokens, role)
+            llm = self._create_groq(model_name, temperature, max_tokens, role)
+        elif provider == "ollama":
+            llm = self._create_ollama(model_name, temperature, max_tokens, role)
+        elif provider == "anthropic":
+            llm = self._create_anthropic(model_name, temperature, max_tokens)
+        elif provider == "openai":
+            llm = self._create_openai(model_name, temperature, max_tokens)
+        elif provider == "gemini":
+            llm = self._create_gemini(model_name, temperature, max_tokens, role)
+        elif model_name:
+            llm = self._create_openai(model_name, temperature, max_tokens)
+        else:
+            raise ValueError(f"Unknown provider: {provider}")
 
-        if model_name:
-            return ChatLiteLLM(model=model_name, temperature=temperature, max_tokens=max_tokens)
+        return self._apply_fallbacks(llm, provider, temperature, max_tokens, role)
 
-        raise ValueError(f"Unknown provider: {provider}")
+    def _apply_fallbacks(
+        self, 
+        primary_llm: BaseChatModel, 
+        primary_provider: str, 
+        temperature: float, 
+        max_tokens: Optional[int],
+        role: Optional[str]
+    ) -> BaseChatModel:
+        """
+        Apply a fallback chain (Gemini -> Claude -> OpenAI -> Ollama) to a primary LLM.
+        """
+        fallbacks = []
+        
+        # Order of fallbacks: Anthropic (Claude) -> OpenAI -> Ollama
+        providers_to_try = []
+        if primary_provider == "gemini":
+            providers_to_try = ["anthropic", "openai", "ollama"]
+        elif primary_provider == "anthropic":
+            providers_to_try = ["openai", "ollama"]
+        elif primary_provider == "openai":
+            providers_to_try = ["anthropic", "ollama"]
+        
+        for p in providers_to_try:
+            try:
+                if p == "anthropic":
+                    fallbacks.append(self._create_anthropic(None, temperature, max_tokens))
+                elif p == "openai":
+                    fallbacks.append(self._create_openai(None, temperature, max_tokens))
+                elif p == "ollama":
+                    fallbacks.append(self._create_ollama(None, temperature, max_tokens, role))
+            except Exception as e:
+                logger.warning(f"Failed to initialize fallback provider {p}", error=str(e))
+                
+        if fallbacks:
+            return primary_llm.with_fallbacks(fallbacks)
+        return primary_llm
 
     def create_from_profile(self, profile: LLMProfile) -> BaseChatModel:
         return self.create(
@@ -129,23 +166,25 @@ class LLMFactory:
                 "No Groq API keys found. Set GROQ_API_KEYS or GROQ_API_KEY in .env"
             )
 
-        if len(keys) >= 1:
-            # Use the rate-limited wrapper with key pool
-            from agent.rate_limited_llm import RateLimitedGroqLLM
+        # Use the rate-limited wrapper with key pool
+        from agent.rate_limited_llm import RateLimitedGroqLLM
 
-            logger.info(
-                "groq_llm_created",
-                model=model,
-                role=role,
-                num_keys=len(keys),
-                mode="pool" if len(keys) > 1 else "single",
-            )
+        logger.info(
+            "groq_llm_created",
+            model=model,
+            role=role,
+            num_keys=len(keys),
+            mode="pool" if len(keys) > 1 else "single",
+        )
 
-            return RateLimitedGroqLLM(
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
+        groq_llm = RateLimitedGroqLLM(
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        # Apply fallback chain so rate-limit exhaustion falls through
+        # to Gemini/Anthropic/OpenAI/Ollama automatically
+        return self._apply_fallbacks(groq_llm, "groq", temperature, max_tokens, role)
 
     def _create_gemini(
         self,
@@ -222,16 +261,20 @@ class LLMFactory:
             model = "ollama/llama3.1:8b"
         elif role == "coder":
             model = "ollama/qwen2.5-coder:7b"
-            num_ctx = 32768
         elif role == "validator":
             model = "ollama/mistral:7b"
         else:
-            model = "ollama/qwen2.5-coder:32b"
+            model = "ollama/mistral:7b"
 
-        # Set specific num_ctx based on role if default models are used
-        if not model_name and not (settings.DEFAULT_LLM_MODEL and settings.DEFAULT_LLM_MODEL.startswith("ollama/")):
-            if role == "coder":
-                num_ctx = 32768
+        # Set specific num_ctx based on role (coder always needs a large context)
+        if role == "coder":
+            num_ctx = 32768
+        else:
+            num_ctx = 8192
+
+        # Strip "ollama/" prefix if present
+        if model.startswith("ollama/"):
+            model = model[len("ollama/"):]
 
         params = self._build_params(
             model,
@@ -242,6 +285,10 @@ class LLMFactory:
         
         # Force keep_alive=0 to prevent VRAM crashes on model switch, and set specific num_ctx
         params["custom_llm_provider"] = "ollama"
+        params["num_ctx"] = num_ctx
+        params["options"] = {
+            "num_ctx": num_ctx
+        }
         params["extra_body"] = {
             "keep_alive": 0,
             "options": {
@@ -405,7 +452,9 @@ class ResilientGeminiLLM(BaseChatModel):
             max_retries=self.max_retries,
             error=str(last_error)[:200],
         )
-        raise last_error
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("Gemini call failed with unknown error")
 
 
 def get_llm(

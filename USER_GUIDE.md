@@ -637,6 +637,69 @@ curl http://localhost:8001/api/secrets
 
 ---
 
+## Token Management & Context Optimization
+
+The agent automatically manages token usage to prevent context overflow and optimize LLM calls across all operations.
+
+### Automatic Features
+
+**Token Counting & Budget Allocation:**
+- Uses `tiktoken` for accurate token counting (with character-based fallback)
+- Automatically allocates context window budget across:
+  - System prompts (1,000 tokens)
+  - Tools/functions (1,500 tokens)
+  - Workspace context (2,000 tokens)
+  - Conversation history (remaining budget)
+  - Response buffer (varies by model)
+
+**Intelligent Message Pruning:**
+- Automatically prunes long conversation histories
+- Preserves critical context (first and last messages)
+- Summarizes middle messages when needed
+- Logs warnings when usage exceeds 80% of budget
+
+**Overflow Handling:**
+- Aggressive pruning: Keeps first + last 3 messages when standard pruning isn't enough
+- Hard truncation: Last resort for extremely long individual messages
+- Automatically creates ultra-compact summaries of omitted content
+
+### Monitoring Token Usage
+
+Token metrics are automatically tracked in the agent state:
+
+```python
+{
+  "token_count": 4500,              # Current token usage
+  "total_tokens_processed": 25000,  # Total tokens across all LLM calls
+  "total_pruning_events": 3,        # Number of times pruning occurred
+  "total_overflow_events": 0,       # Number of overflow handling events
+  "max_token_count_reached": 8000,  # Peak token usage in session
+  "context_budget": {               # Budget allocation details
+    "model": "gpt-4o",
+    "max_tokens": 128000,
+    "conversation": 121500,
+    "workspace_context": 2000,
+    "system_prompt": 1000,
+    "tools": 1500
+  }
+}
+```
+
+### Performance
+
+- **Token counting overhead**: <10ms per operation
+- **Message pruning overhead**: <50ms per operation
+- **No user intervention required**: All optimizations are automatic
+
+### Best Practices
+
+1. **Use models with larger context windows** for complex projects (GPT-4o, Claude 3.5 Sonnet recommended)
+2. **Monitor logs** for frequent pruning events (may indicate conversations are too long)
+3. **Break down large projects** into smaller sessions if you see frequent overflow events
+4. **Check metrics** in the agent state to understand token consumption patterns
+
+---
+
 ## Support & Resources
 
 - **Documentation:** See `ARCHITECTURE.md` and `DEVELOPMENT.md`

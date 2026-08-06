@@ -53,67 +53,69 @@ export function SandboxPanel() {
         }
     };
 
+    const isRunning = sandbox?.status === 'running';
+
     return (
-        <div className="h-12 border-b border-border bg-surface flex items-center gap-2 px-3 text-xs">
-            <span className="text-text-muted">Sandbox</span>
-            <span className={`px-2 py-1 rounded border ${
-                sandbox?.status === 'running'
-                    ? 'border-green-800 text-green-400 bg-green-900/30'
-                    : 'border-border text-text-muted bg-surface-hover'
+        <div className="h-10 border-b border-border/40 bg-surface flex items-center gap-2 px-3 text-xs shrink-0">
+            <span className="text-text-muted font-medium">Sandbox</span>
+            <span className={`px-2 py-0.5 rounded text-[11px] font-medium border ${
+                isRunning
+                    ? 'border-emerald-500/20 text-emerald-400 bg-emerald-500/10'
+                    : 'border-border/40 text-text-muted bg-surface-hover'
             }`}>
                 {sandbox?.status || 'unknown'}
             </span>
-            {previewUrl && <span className="text-text-muted truncate max-w-52">{previewUrl}</span>}
+            {previewUrl && <span className="text-text-muted truncate max-w-52 text-[11px] font-mono">{previewUrl}</span>}
 
             <div className="ml-auto flex items-center gap-1">
                 <button title="Refresh" className="icon-btn" onClick={() => refreshSandbox(activeSessionId)}>
-                    <RefreshCcw size={14} />
+                    <RefreshCcw size={13} />
                 </button>
                 <button title="Retry queued message" className="icon-btn" onClick={retryPending}>
-                    <Play size={14} />
+                    <Play size={13} />
                 </button>
                 <button
                     title="Pause sandbox"
                     className="icon-btn"
                     onClick={() => runAction('Sandbox paused', () => pauseMutation.mutateAsync())}
                 >
-                    <Pause size={14} />
+                    <Pause size={13} />
                 </button>
                 <button
                     title="Resume sandbox"
                     className="icon-btn"
                     onClick={() => runAction('Sandbox resumed', () => resumeMutation.mutateAsync())}
                 >
-                    <Square size={14} />
+                    <Square size={13} />
                 </button>
                 <button
                     title="Delete current sandbox"
-                    className="icon-btn text-red-400"
+                    className="icon-btn text-rose-400 hover:text-rose-300"
                     onClick={() => runAction('Sandbox deleted', async () => {
                         await deleteMutation.mutateAsync();
                         setSandbox(null);
                         setPreviewUrl(null);
                     })}
                 >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} />
                 </button>
-                <div className="w-px h-4 bg-border mx-1" />
+                <div className="w-px h-3 bg-border/40 mx-1" />
                 <button
                     title="Download Workspace (ZIP)"
-                    className="text-icon-btn"
+                    className="btn-secondary h-7 px-2.5 text-xs"
                     onClick={() => {
                         window.open(`http://127.0.0.1:8000/api/agent/sandbox/${activeSessionId}/download`, '_blank');
                     }}
                 >
-                    <Download size={14} />
+                    <Download size={13} />
                     <span>Download</span>
                 </button>
                 <button
                     title="Manage all sandboxes"
-                    className="text-icon-btn"
+                    className="btn-secondary h-7 px-2.5 text-xs"
                     onClick={() => setShowManager(true)}
                 >
-                    <Box size={14} />
+                    <Box size={13} />
                     <span>Manage</span>
                 </button>
             </div>

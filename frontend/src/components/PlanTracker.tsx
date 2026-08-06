@@ -15,8 +15,10 @@ export const PlanTracker: React.FC = () => {
 
     // Attempt to extract files from the plan JSON.
     // The plan might look like { project: "...", files: ["index.html", "src/main.js"] }
-    let plannedFiles: string[] = [];
-    if (Array.isArray(plan.files)) {
+    let plannedFiles: any[] = [];
+    if (Array.isArray(plan.steps)) {
+        plannedFiles = plan.steps;
+    } else if (Array.isArray(plan.files)) {
         plannedFiles = plan.files;
     } else if (Array.isArray(plan.file_list)) {
         plannedFiles = plan.file_list;
@@ -28,16 +30,19 @@ export const PlanTracker: React.FC = () => {
     if (plannedFiles.length === 0) return null;
 
     // Normalize paths for comparison (e.g., remove leading './')
-    const normalize = (p: string) => p.replace(/^\.\//, '').trim();
+    const normalize = (p: string) => typeof p === 'string' ? p.replace(/^\.\//, '').trim() : '';
     
     const normalizedGenerated = generatedFiles.map(normalize);
     
-    const progress = plannedFiles.map(file => {
-        const normFile = normalize(file);
+    const progress = plannedFiles.map((item: any) => {
+        const filePath = typeof item === 'string' ? item : (item.file || item.path || '');
+        if (!filePath) return null;
+        
+        const normFile = normalize(filePath);
         // Check if any generated file ends with this planned file (to handle relative paths)
         const isCreated = normalizedGenerated.some(gf => gf === normFile || gf.endsWith(`/${normFile}`));
-        return { file, isCreated };
-    });
+        return { file: filePath, isCreated };
+    }).filter(Boolean) as { file: string, isCreated: boolean }[];
 
     const completedCount = progress.filter(p => p.isCreated).length;
     const totalCount = plannedFiles.length;

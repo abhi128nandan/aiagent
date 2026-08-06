@@ -1,7 +1,9 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 fastapi
 uvicorn
 docker
 langgraph>=0.2.0
+langsmith
 langchain
 langchain-core
 langchain-community
@@ -13,7 +15,7 @@ websockets
 pymupdf
 docx2txt
 pexpect
-litellm
+litellm==1.48.0
 playwright
 html2text
 pydantic-settings
@@ -27,8 +29,12 @@ ruff
 # ── Phase 1: Token & Context Management ──
 tiktoken
 # ── Phase 4: SRS Document Processing & RAG ──
+markitdown[pdf]
 pdfplumber
 sentence-transformers
 chromadb
 # ── Phase 5: Web Research ──
 ddgs
+python-multipart
+# ── Phase 6: Autonomous Code Analysis Engine ──
+networkx

@@ -1,0 +1,46 @@
+# Project: TodoApp
+
+## Description
+A task management application with React frontend and Express backend
+
+## Tasks Checklist
+
+- [ ] **MODIFY** `src/App.jsx`
+  *Description:* Replace the default Vite React boilerplate with the To-Do app UI. Add state management for tasks (useState), task input field, and task list rendering. Implement addTask(), updateTask(), deleteTask() functions. Add task form with title, description, due date, priority, and category fields. Add filters for completed/pending tasks.
+
+- [ ] **MODIFY** `src/App.css`
+  *Description:* Add CSS for task cards, form layout, priority indicators (colors), category tags, and responsive design. Implement animations for task transitions and completion states.
+
+- [ ] **MODIFY** `package.json`
+  *Description:* Add backend dependencies: express, mongoose, cors, dotenv. Add frontend dependencies: axios for API calls.
+
+- [ ] **CREATE** `server.js`
+  *Description:* Create Express server with middleware for JSON parsing, CORS, and error handling. Set up routes for tasks and connect to MongoDB using Mongoose.
+
+- [ ] **CREATE** `routes/tasks.js`
+  *Description:* Define REST API endpoints for tasks: GET /api/tasks, POST /api/tasks, PUT /api/tasks/:id, DELETE /api/tasks/:id. Implement request validation.
+
+- [ ] **CREATE** `controllers/taskController.js`
+  *Description:* Implement controller functions for CRUD operations. Use async/await with Mongoose to interact with the Task model.
+
+- [ ] **CREATE** `models/Task.js`
+  *Description:* Define Mongoose schema for Task with fields: title, description, completed, dueDate, priority, category, createdAt, updatedAt.
+
+- [ ] **CREATE** `config/db.js`
+  *Description:* Implement MongoDB connection using Mongoose. Load MongoDB URI from .env file. Add connection error handling.
+
+- [ ] **CREATE** `.env`
+  *Description:* Add environment variables: MONGO_URI, PORT, CORS_ORIGIN. Set default values for development.
+
+- [ ] **CREATE** `src/components/TaskList.jsx`
+  *Description:* Create TaskList component to display task cards. Implement checkbox for completion, edit button, delete button, and priority/category tags.
+
+- [ ] **CREATE** `src/components/AddTaskForm.jsx`
+  *Description:* Create AddTaskForm component with form validation. Handle form submission to create new task via API.
+
+- [ ] **CREATE** `src/services/api.js`
+  *Description:* Create Axios instance for API calls with base URL and request/response interceptors for error handling.
+
+- [ ] **MODIFY** `src/index.css`
+  *Description:* Add global styles for the application including font imports, base styles, and utility classes for task components.
+

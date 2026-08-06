@@ -118,6 +118,14 @@ export const api = {
             requestJson<{ path: string; content: string }>(
                 `/api/agent/sandbox/${sessionId}/files/read?path=${encodeURIComponent(path)}`
             ),
+        writeFile: (sessionId: string, path: string, content: string) =>
+            requestJson<{ success: boolean }>(
+                `/api/agent/sandbox/${sessionId}/files/write`,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({ path, content })
+                }
+            ),
         pause: (sessionId: string) =>
             requestJson<{ paused: boolean }>(`/api/agent/sandbox/${sessionId}/pause`, { method: 'POST' }),
         resume: (sessionId: string) =>
@@ -224,6 +232,23 @@ export const api = {
         delete: (conversationId: string) =>
             requestJson<{ deleted: boolean }>(`/api/conversations/${conversationId}`, { method: 'DELETE' }),
     },
+    observability: {
+        getLogs: (sessionId: string, agentName?: string, eventType?: string, status?: string, search?: string) => {
+            const params = new URLSearchParams();
+            if (agentName) params.append('agent_name', agentName);
+            if (eventType) params.append('event_type', eventType);
+            if (status) params.append('status', status);
+            if (search) params.append('search', search);
+            const queryStr = params.toString() ? `?${params.toString()}` : '';
+            return requestJson<any[]>(`/api/agent/session/${sessionId}/observability${queryStr}`);
+        },
+        getSummary: (sessionId: string) =>
+            requestJson<any>(`/api/agent/session/${sessionId}/observability/summary`),
+    },
+    architecture: {
+        getPlan: (sessionId: string) =>
+            requestJson<any>(`/api/agent/session/${sessionId}/architecture`),
+    },
 };
 
 export const backendApi = {
@@ -232,6 +257,7 @@ export const backendApi = {
     sandboxHealth: api.sandbox.health,
     listFiles: api.sandbox.files,
     readFile: api.sandbox.readFile,
+    writeFile: api.sandbox.writeFile,
     pauseSandbox: api.sandbox.pause,
     resumeSandbox: api.sandbox.resume,
     deleteSandbox: api.sandbox.delete,

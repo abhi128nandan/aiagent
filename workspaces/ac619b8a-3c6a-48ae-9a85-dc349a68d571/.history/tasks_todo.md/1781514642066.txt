@@ -1,0 +1,46 @@
+# Project: TodoApp
+
+## Description
+A task management application with React frontend and Express backend
+
+## Tasks Checklist
+
+- [ ] **MODIFY** `src/App.jsx`
+  *Description:* Replace Vite boilerplate with To-Do app UI. Implement useState for tasks array, form inputs (title, description, dueDate, priority, category), and filters (completed/pending). Add addTask(), updateTask(), deleteTask() functions with API calls to /api/tasks. Render AddTaskForm and TaskList components with conditional filtering.
+
+- [ ] **MODIFY** `src/App.css`
+  *Description:* Add CSS for task cards (box-shadow, padding), priority indicators (red/yellow/green borders), category tags (pill-shaped badges), responsive grid layout, and transition animations for task completion state. Implement dark mode toggle styles.
+
+- [ ] **MODIFY** `package.json`
+  *Description:* Add frontend dependencies: "axios": "^1.6.2", "react-datepicker": "^4.2.0". Add backend dependencies: "express": "^4.20.2", "mongoose": "^8.5.0", "cors": "^2.8.5", "dotenv": "^16.3.1"
+
+- [x] **CREATE** `server.js`
+  *Description:* Create Express server with: app.use(express.json()), app.use(cors({origin: process.env.CORS_ORIGIN})). Set up routes: app.use('/api/tasks', require('./routes/tasks')). Add error handling middleware and start server on PORT (default 5000).
+
+- [ ] **CREATE** `routes/tasks.js`
+  *Description:* Define REST routes: GET /api/tasks (getAllTasks), POST /api/tasks (createTask), GET /api/tasks/:id (getTaskById), PUT /api/tasks/:id (updateTask), DELETE /api/tasks/:id (deleteTask). Add validation middleware for required fields.
+
+- [ ] **CREATE** `controllers/taskController.js`
+  *Description:* Implement async controller functions: getTasks(), createTask(), getTaskById(), updateTask(), deleteTask(). Use Task model methods with try/catch error handling and proper HTTP status codes.
+
+- [ ] **CREATE** `models/Task.js`
+  *Description:* Define Mongoose schema with fields: title (required), description, completed (default: false), dueDate (Date), priority (enum: 'low', 'medium', 'high'), category, createdAt (timestamp), updatedAt (timestamp). Add virtual for formatted due date.
+
+- [ ] **CREATE** `config/db.js`
+  *Description:* Implement MongoDB connection using mongoose.connect(process.env.MONGO_URI). Add connection event listeners for success/error. Set mongoose options: { useNewUrlParser: true, useUnifiedTopology: true }
+
+- [ ] **CREATE** `.env`
+  *Description:* Add environment variables: MONGO_URI=mongodb://localhost:27017/todoapp, PORT=5000, CORS_ORIGIN=http://localhost:5173. Add comment for production values.
+
+- [ ] **CREATE** `src/components/TaskList.jsx`
+  *Description:* Create TaskList component with map() over tasks array. Render task cards with: checkbox for completion, priority color indicators, category tags, edit/delete buttons. Add onClick handlers for task updates and deletions.
+
+- [ ] **CREATE** `src/components/AddTaskForm.jsx`
+  *Description:* Create form with fields: title (required), description, dueDate (react-datepicker), priority (select), category (select). Add form validation, handleSubmit() with API call to /api/tasks, and reset form on success.
+
+- [ ] **CREATE** `src/services/api.js`
+  *Description:* Create Axios instance with base URL: process.env.REACT_APP_API_URL. Add request interceptor for auth token (future-proofing) and response interceptor for error handling. Export get(), post(), put(), delete() wrappers.
+
+- [ ] **MODIFY** `src/index.css`
+  *Description:* Add global styles: @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap'). Define utility classes for task priorities (.priority-low, .priority-medium, .priority-high) with color variables.
+

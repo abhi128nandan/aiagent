@@ -11,7 +11,9 @@ This module powers the Research node so the agent knows:
   - How to fix errors it hasn't seen in training data
 """
 import asyncio
+import hashlib
 import re
+import time
 from typing import Optional
 from dataclasses import dataclass, field
 
@@ -22,6 +24,10 @@ logger = get_logger(__name__)
 # Rate limiting: max 1 search per second to avoid bans
 _last_search_time: float = 0
 _SEARCH_COOLDOWN = 1.0  # seconds
+
+# ── Search result cache (survives across node calls within a process) ──
+_search_cache: dict[str, tuple[float, 'SearchResponse']] = {}
+_CACHE_TTL = 600  # 10 minutes — tech docs don't change that fast
 
 
 @dataclass
@@ -93,6 +99,26 @@ async def search_web(query: str, max_results: int = 5) -> SearchResponse:
     except Exception as e:
         logger.error("web_search_failed", query=query, error=str(e))
         return SearchResponse(query=query, error=str(e))
+
+
+async def search_web_cached(query: str, max_results: int = 5) -> SearchResponse:
+    """
+    Cached wrapper around search_web. Avoids redundant network calls
+    when the same query is issued within the TTL window (e.g. on re-plan).
+    """
+    cache_key = hashlib.md5(f"{query.lower().strip()}:{max_results}".encode()).hexdigest()
+    now = time.time()
+
+    if cache_key in _search_cache:
+        cached_time, cached_response = _search_cache[cache_key]
+        if now - cached_time < _CACHE_TTL:
+            logger.info("search_cache_hit", query=query[:80])
+            return cached_response
+
+    result = await search_web(query, max_results)
+    if not result.error:
+        _search_cache[cache_key] = (now, result)
+    return result
 
 
 async def fetch_page_content(url: str, max_chars: int = 8000) -> str:
@@ -185,7 +211,8 @@ async def search_and_extract(
         if result.url:
             tasks.append(fetch_page_content(result.url, max_chars=max_content_chars))
         else:
-            tasks.append(asyncio.coroutine(lambda: "")())
+            async def _empty(): return ""
+            tasks.append(_empty())
 
     contents = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -227,27 +254,27 @@ def generate_research_queries(plan_json: dict) -> list[str]:
         scaffold_parts.append("npm create vite react")
         if language == "typescript":
             scaffold_parts.append("typescript template")
-        queries.append(f"npm create vite@latest react {language} project setup 2025")
+        queries.append(f"npm create vite@latest react {language} project setup 2026")
     elif frontend == "vue":
-        queries.append(f"npm create vite@latest vue {language} project setup 2025")
+        queries.append(f"npm create vite@latest vue {language} project setup 2026")
     elif frontend == "angular":
-        queries.append(f"npx @angular/cli new project setup 2025")
+        queries.append(f"npx @angular/cli new project setup 2026")
     elif frontend == "svelte":
-        queries.append(f"npm create vite@latest svelte {language} setup 2025")
+        queries.append(f"npm create vite@latest svelte {language} setup 2026")
     elif frontend == "next":
-        queries.append(f"npx create-next-app@latest {language} setup 2025")
+        queries.append(f"npx create-next-app@latest {language} setup 2026")
 
     # ── 2. Backend framework setup ────────────────────────────────────
     if backend == "express":
-        queries.append(f"express.js {language} project structure best practices 2025")
+        queries.append(f"express.js {language} project structure best practices 2026")
     elif backend == "fastapi":
-        queries.append("fastapi project structure with uvicorn setup 2025")
+        queries.append("fastapi project structure with uvicorn setup 2026")
     elif backend == "flask":
-        queries.append("flask python project structure setup 2025")
+        queries.append("flask python project structure setup 2026")
     elif backend == "spring_boot":
-        queries.append("spring boot project setup gradle maven 2025")
+        queries.append("spring boot project setup gradle maven 2026")
     elif backend == "django":
-        queries.append("django project setup structure 2025")
+        queries.append("django project setup structure 2026")
 
     # ── 3. Database integration ───────────────────────────────────────
     if database != "none":
@@ -259,7 +286,7 @@ def generate_research_queries(plan_json: dict) -> list[str]:
     # ── 4. Full-stack combination (if both frontend + backend) ────────
     if frontend != "none" and backend != "none":
         queries.append(
-            f"{frontend} {backend} full-stack project structure {language} 2025"
+            f"{frontend} {backend} full-stack project structure {language} 2026"
         )
 
     # ── 5. Project-specific query based on description ────────────────
@@ -271,9 +298,9 @@ def generate_research_queries(plan_json: dict) -> list[str]:
     # ── 6. Fallback: If no framework was detected, search generically ─
     if not queries:
         if language:
-            queries.append(f"{language} web application project setup 2025")
+            queries.append(f"{language} web application project setup 2026")
         else:
-            queries.append("web application project setup best practices 2025")
+            queries.append("web application project setup best practices 2026")
 
     # Deduplicate and limit
     seen = set()
@@ -284,4 +311,4 @@ def generate_research_queries(plan_json: dict) -> list[str]:
             seen.add(q_normalized)
             unique_queries.append(q.strip())
 
-    return unique_queries[:5]  # Max 5 queries
+    return unique_queries[:3]  # Max 3 targeted queries — less is more, saves tokens

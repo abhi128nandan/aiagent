@@ -1,0 +1,37 @@
+# Project: TodoApp
+
+## Description
+A task management application with React frontend and Express backend
+
+## Tasks Checklist
+
+- [ ] **MODIFY** `src/App.jsx`
+  *Description:* Replace Vite boilerplate with task management UI: add TaskList component to display tasks with checkboxes, due dates, priority indicators, and category tags. Add TaskForm component with title, description, due date, priority (dropdown), and category (dropdown) inputs. Implement state management with useState for tasks array and form inputs. Add handleAddTask, handleToggleComplete, handleDeleteTask, and handleEditTask functions for CRUD operations.
+
+- [ ] **MODIFY** `src/App.css`
+  *Description:* Replace default styles with task management styles: create .task-list, .task-item, .task-form, .priority-high, .priority-medium, .priority-low CSS classes. Add responsive grid layout for task cards with hover effects, checkbox styling, and category tag badges. Implement dark mode toggle with CSS variables.
+
+- [ ] **MODIFY** `package.json`
+  *Description:* Add backend dependencies: install express, mongoose, cors, and dotenv with 'npm install express mongoose cors dotenv'. Add dev dependencies for backend development: 'npm install --save-dev nodemon'. Add start script for backend: 'node server/index.js' and dev script: 'nodemon server/index.js'.
+
+- [ ] **CREATE** `server/index.js`
+  *Description:* Create Express server with MongoDB connection: set up Express app with CORS, JSON parsing middleware. Connect to MongoDB using mongoose with connection string 'mongodb://localhost:27017/todoapp'. Define PORT=5000 and add error handling middleware.
+
+- [ ] **CREATE** `server/models/Task.js`
+  *Description:* Create Mongoose Task model with schema: title (required string), description (string), completed (boolean), dueDate (date), priority (enum: 'high', 'medium', 'low'), category (string), createdAt (timestamp). Add virtual for formatted due date.
+
+- [ ] **CREATE** `server/routes/tasks.js`
+  *Description:* Create task routes: POST /api/tasks for creating tasks, GET /api/tasks for listing all tasks, GET /api/tasks/:id for single task, PUT /api/tasks/:id for updating, DELETE /api/tasks/:id for deleting. Implement async/await with try/catch error handling.
+
+- [ ] **CREATE** `src/api.js`
+  *Description:* Create API client with fetch wrappers: add getTasks(), createTask(taskData), updateTask(id, updates), deleteTask(id) functions. Add base URL 'http://localhost:5000/api/tasks' and error handling for HTTP responses.
+
+- [ ] **CREATE** `src/components/TaskForm.jsx`
+  *Description:* Create reusable TaskForm component with controlled inputs for title, description, due date, priority, and category. Add form validation for required fields and date formatting. Implement handleSubmit to call createTask API and reset form after submission.
+
+- [ ] **CREATE** `src/components/TaskList.jsx`
+  *Description:* Create TaskList component to render task items: display title, due date, priority badge, category tag, and completion checkbox. Add edit and delete buttons with onClick handlers. Implement conditional rendering for completed tasks.
+
+- [ ] **CREATE** `.env`
+  *Description:* Create environment variables file: add MONGO_URI='mongodb://localhost:27017/todoapp' and PORT=5000 for backend configuration.
+

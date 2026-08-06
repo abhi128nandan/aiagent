@@ -1,0 +1,28 @@
+# Project: react-todo-app
+
+## Description
+A simple To-Do application built with React and Vite.
+
+## Tasks Checklist
+
+- [ ] **CREATE** `src/components/TodoForm.jsx`
+  *Description:* Create the `TodoForm` component. This component will provide an input field and a button to add new todo items. It will manage its own local state for the input text using `useState`. On form submission, it will prevent the default behavior, call an `addTodo` function passed via props with the current input value, and then clear the input field. The component will export itself as default.
+
+- [x] **CREATE** `src/components/TodoItem.jsx`
+  *Description:* Create the `TodoItem` component. This component will represent a single todo item in the list. It will receive a `todo` object (containing `id`, `text`, `completed`), a `toggleTodo` function, and a `deleteTodo` function as props. It will render the todo's text, a checkbox whose checked state reflects `todo.completed` and triggers `toggleTodo` on change, and a delete button that triggers `deleteTodo` on click. The todo text will have a conditional CSS class (e.g., `completed`) to apply a line-through style when `todo.completed` is true. The component will export itself as default.
+
+- [x] **CREATE** `src/components/TodoList.jsx`
+  *Description:* Create the `TodoList` component. This component will be responsible for rendering the collection of `TodoItem`s. It will receive the `todos` array, `toggleTodo` function, and `deleteTodo` function as props. It will map over the `todos` array, rendering a `TodoItem` for each todo object and passing the individual `todo` data, `toggleTodo`, and `deleteTodo` functions as props to each `TodoItem`. The component will export itself as default.
+
+- [x] **MODIFY** `src/App.jsx`
+  *Description:* Refactor the main `App` component to implement the core To-Do application logic. Remove all existing boilerplate code, including the `count` state, hero images, and documentation sections. Import `useState` and `useEffect` from React, and import the newly created `TodoForm` and `TodoList` components. Define the `todos` state using `useState`, initializing it by attempting to load from `localStorage` (parsing JSON) or defaulting to an empty array. Implement `addTodo(text)`, `toggleTodo(id)`, and `deleteTodo(id)` functions to manage the `todos` state. Use a `useEffect` hook to persist the `todos` array to `localStorage` (stringifying JSON) whenever the `todos` state changes. The component's render method will return a main container (`div` or `section`) with a prominent heading (e.g., 'My To-Do App'), followed by the `TodoForm` component (passing the `addTodo` function as a prop), and the `TodoList` component (passing the `todos` array, `toggleTodo`, and `deleteTodo` functions as props). Remove unused imports like `reactLogo`, `viteLogo`, `heroImg`.
+
+- [x] **MODIFY** `src/App.css`
+  *Description:* Clear all existing boilerplate CSS rules. Add application-specific styles for the To-Do app. This includes styling for the main container (e.g., `App` class for centering, max-width, padding), the main heading, the `TodoForm` (input field and submit button for layout and appearance), the `TodoList` (e.g., `ul` for removing default list styles), and individual `TodoItem`s (e.g., `li` for spacing, alignment, and a `completed` class to apply `text-decoration: line-through` and potentially change color for completed tasks). Ensure basic responsive adjustments if necessary.
+
+- [x] **MODIFY** `src/index.css`
+  *Description:* Modify global styles. Remove any default Vite/React boilerplate styles that are not relevant to the To-Do app. Add basic global styling for the `body` and `#root` elements, such as setting a default `font-family`, `margin: 0`, `padding: 0`, and a `background-color`. These styles will provide a clean base for the To-Do application's UI.
+
+- [x] **MODIFY** `README.md`
+  *Description:* Update the `README.md` file. Replace the default 'React + Vite' template description with a clear title 'React To-Do App'. Provide a brief description of the application's functionality (add, complete, delete tasks). Remove any irrelevant sections about React Compiler or ESLint configuration specific to the template. Add simple instructions on how to set up and run the To-Do application locally (e.g., `npm install`, `npm run dev`).
+

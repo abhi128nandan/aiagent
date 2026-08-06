@@ -1,0 +1,25 @@
+# Project: react-todo-app
+
+## Description
+A simple To-Do application built with React and Vite.
+
+## Tasks Checklist
+
+- [x] **CREATE** `src/components/TodoInput.jsx`
+  *Description:* Create a `TodoInput` component. This component will contain an input field for new to-do items and an 'Add' button. It will manage its own local state for the input value and will receive an `onAddTodo` prop function from its parent (`App.jsx`) to add the new item to the main list. The input should clear after submission.
+
+- [x] **CREATE** `src/components/TodoItem.jsx`
+  *Description:* Create a `TodoItem` component. This component will display a single to-do item. It will receive `todo` (an object with `id`, `text`, `completed`), `onToggleComplete`, and `onDeleteTodo` as props. It should render the to-do text, a checkbox to toggle its completion status, and a button to delete the item. The text should have a strikethrough style if `completed` is true.
+
+- [ ] **CREATE** `src/components/TodoList.jsx`
+  *Description:* Create a `TodoList` component. This component will receive an array of `todos`, `onToggleComplete`, and `onDeleteTodo` as props. It will map over the `todos` array and render a `TodoItem` component for each to-do, passing down the individual `todo` object and the respective handler functions.
+
+- [ ] **MODIFY** `src/App.jsx`
+  *Description:* Replace the default Vite React boilerplate with the main To-Do application logic. Import `useState` from 'react' and the `TodoInput`, `TodoList` components. Implement `useState` to manage the `todos` array, where each todo is an object `{ id: number, text: string, completed: boolean }`. Implement `addTodo` function to add new items, `toggleTodo` to change an item's completion status, and `deleteTodo` to remove an item. Render the `TodoInput` and `TodoList` components, passing the necessary props and handler functions.
+
+- [ ] **MODIFY** `src/App.css`
+  *Description:* Clear the existing boilerplate styles and add specific CSS for the To-Do application. This includes styling for the main `App` container, `TodoInput` (input field and button), `TodoList` (unordered list), and `TodoItem` (list item, checkbox, text, delete button). Add styles for completed items (e.g., text-decoration: line-through) and basic layout/spacing.
+
+- [ ] **MODIFY** `src/index.css`
+  *Description:* Clear the existing global styles and add basic global CSS for the To-Do application. This includes a CSS reset (or minimal body/html styling), font definitions, and basic color variables if desired. Ensure the root element (`#root`) has appropriate dimensions and centering.
+

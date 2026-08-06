@@ -1,0 +1,28 @@
+# Project: react-todo-app
+
+## Description
+A simple To-Do application built with React and Vite.
+
+## Tasks Checklist
+
+- [ ] **MODIFY** `src/index.css`
+  *Description:* Clear existing global styles. Add a basic CSS reset, define root font size, set `body` styles (font family, background color, text color), and ensure a consistent box-sizing model. This will provide a clean base for the To-Do app's styling.
+
+- [ ] **MODIFY** `src/App.css`
+  *Description:* Clear existing `App.css` styles. Add specific styles for the main `TodoApp` container (max-width, margin auto, padding, background, box-shadow, border-radius). Style the `h1` title. Add styles for the `TodoForm` (display flex, gap, input styling, button styling). Style the `TodoList` (list-style none, padding 0). Style individual `TodoItem` components (display flex, align-items center, justify-content space-between, padding, margin, border, background). Include styles for completed tasks (text-decoration line-through, color gray) and the delete button.
+
+- [x] **CREATE** `src/components/TodoForm.jsx`
+  *Description:* Create a new functional React component `TodoForm`. This component will manage the input for new todo items. It will use `useState` to track the current input value. It will render a `<form>` containing an `<input type="text">` for the todo text and a `<button type="submit">` to add the todo. The form will have an `onSubmit` handler that prevents the default form submission, calls an `onAddTodo` prop with the current input value, and then clears the input field.
+
+- [x] **CREATE** `src/components/TodoItem.jsx`
+  *Description:* Create a new functional React component `TodoItem`. This component will display a single todo item. It will receive `todo` (an object with `id`, `text`, `completed`), `onToggleComplete`, and `onDeleteTodo` as props. It will render a `div` element. Inside, it will display the todo's text within a `span` element, applying a conditional CSS class (e.g., 'completed') if `todo.completed` is true. It will also include a checkbox input to toggle the `completed` status (calling `onToggleComplete`) and a button to delete the todo (calling `onDeleteTodo`).
+
+- [ ] **CREATE** `src/components/TodoList.jsx`
+  *Description:* Create a new functional React component `TodoList`. This component will be responsible for rendering the list of all todo items. It will receive `todos` (an array of todo objects), `onToggleComplete`, and `onDeleteTodo` as props. It will render an `<ul>` element. Inside, it will map over the `todos` array, rendering a `TodoItem` component for each todo. Each `TodoItem` will receive its respective `todo` object, `onToggleComplete`, and `onDeleteTodo` as props, along with a unique `key` prop.
+
+- [ ] **MODIFY** `src/App.jsx`
+  *Description:* Replace the entire default Vite React boilerplate content. Import `useState` and `useEffect` from 'react'. Implement the main application logic: define the `todos` state using `useState`, initializing it by attempting to load from `localStorage` or defaulting to an empty array. Use `useEffect` to persist the `todos` state to `localStorage` whenever it changes. Implement `addTodo` (to add a new todo with a unique ID), `toggleComplete` (to flip a todo's completed status), and `deleteTodo` (to remove a todo). The component will render a main `div` acting as the `TodoApp` container, an `h1` title 'My To-Do List', the `TodoForm` component (passing `addTodo` as a prop), and the `TodoList` component (passing `todos`, `toggleComplete`, and `deleteTodo` as props).
+
+- [ ] **MODIFY** `README.md`
+  *Description:* Update the `README.md` file to reflect the new React To-Do application. Remove the default Vite + React template description. Add a clear description of the To-Do app's features (add, complete, delete tasks, persistence). Provide instructions on how to set up and run the application (npm install, npm run dev).
+

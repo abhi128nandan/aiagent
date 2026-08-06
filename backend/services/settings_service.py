@@ -20,6 +20,10 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "sandbox_timeout": settings.SANDBOX_TIMEOUT,
     "max_retries": 5,
     "debug_mode": settings.DEBUG,
+    "role_profile_planner": None,
+    "role_profile_backend": None,
+    "role_profile_frontend": None,
+    "role_profile_validator": None,
 }
 
 ALLOWED_SETTINGS: dict[str, type | tuple[type, ...]] = {
@@ -27,6 +31,10 @@ ALLOWED_SETTINGS: dict[str, type | tuple[type, ...]] = {
     "sandbox_timeout": int,
     "max_retries": int,
     "debug_mode": bool,
+    "role_profile_planner": (str, type(None)),
+    "role_profile_backend": (str, type(None)),
+    "role_profile_frontend": (str, type(None)),
+    "role_profile_validator": (str, type(None)),
 }
 
 

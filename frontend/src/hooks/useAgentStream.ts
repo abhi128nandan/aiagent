@@ -17,6 +17,19 @@ interface LangGraphEvent {
 const extractWrite = (content: string) =>
     content.match(/<write\s+path=['"]([^'"]+)['"]>([\s\S]*?)<\/write>/);
 
+const logAgentEvent = (msg: string, sessionId?: string) => {
+    const store = useAgentStore.getState();
+    const id = sessionId || store.activeSessionId;
+    if (!id) return;
+    store.addLog(msg, id);
+    let color = '\x1b[90m'; // gray
+    if (msg.includes('✅') || msg.includes('📦')) color = '\x1b[32m'; // green
+    if (msg.includes('❌')) color = '\x1b[31m'; // red
+    if (msg.includes('⏳') || msg.includes('📝')) color = '\x1b[36m'; // cyan
+    if (msg.includes('🔧') || msg.includes('⌨')) color = '\x1b[33m'; // yellow
+    store.appendInteractiveOutput(`\r\n${color}${msg.replace(/\n/g, '\r\n')}\x1b[0m\r\n`, id);
+};
+
 export function useAgentStream() {
     const queryClient = useQueryClient();
     const ws = useRef<WebSocket | null>(null);
@@ -48,7 +61,7 @@ export function useAgentStream() {
                 try {
                     files[path] = (await api.sandbox.readFile(sessionId, path)).content;
                 } catch (error) {
-                    store.addLog(`> Could not read ${path}: ${error instanceof Error ? error.message : String(error)}`, sessionId);
+                    logAgentEvent(`> Could not read ${path}: ${error instanceof Error ? error.message : String(error)}`, sessionId);
                 }
             }));
 
@@ -70,7 +83,7 @@ export function useAgentStream() {
             queryClient.invalidateQueries({ queryKey: queryKeys.sandbox.status(sessionId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.sandbox.files(sessionId) });
         } catch (error) {
-            store.addLog(`> Sandbox refresh failed: ${error instanceof Error ? error.message : String(error)}`, sessionId);
+            logAgentEvent(`> Sandbox refresh failed: ${error instanceof Error ? error.message : String(error)}`, sessionId);
         }
     }, [queryClient]);
 
@@ -94,7 +107,180 @@ export function useAgentStream() {
         }
 
         const store = useAgentStore.getState();
+
+        // ── Streaming parser events (real-time file preview) ──────────
+        if (event.type === 'action_open' && (event as any).action === 'write') {
+            store.startFileStream((event as any).path, sessionId);
+            logAgentEvent(`> 📝 Writing ${(event as any).path}...`, sessionId);
+            return;
+        }
+
+        if (event.type === 'action_chunk' && (event as any).action === 'write') {
+            // content contains the FULL body so far, not a delta
+            const fullContent = (event as any).content || '';
+            const current = store.streamingFileBySession[sessionId];
+            if (current && current.isStreaming) {
+                // Replace rather than append since parser sends full body
+                const id = sessionId || store.activeSessionId;
+                const files = store.filesBySession[id] || {};
+                useAgentStore.setState({
+                    streamingFileBySession: {
+                        ...store.streamingFileBySession,
+                        [id]: { ...current, content: fullContent },
+                    },
+                    filesBySession: {
+                        ...store.filesBySession,
+                        [id]: { ...files, [current.path]: fullContent },
+                    },
+                });
+            }
+            return;
+        }
+
+        if (event.type === 'action_close' && (event as any).action === 'write') {
+            store.completeFileStream((event as any).content || '', sessionId);
+            logAgentEvent(`> ✅ Wrote ${(event as any).path}`, sessionId);
+            return;
+        }
+
+        if (event.type === 'action_exec') {
+            const exitCode = (event as any).exit_code;
+            const icon = exitCode === 0 ? '✅' : '❌';
+            const detail = (event as any).command || (event as any).path || (event as any).query || '';
+            logAgentEvent(`> ${icon} ${(event as any).action}: ${detail} (exit: ${exitCode})`, sessionId);
+            return;
+        }
+
+        if (event.type === 'action_exec_start') {
+            logAgentEvent(`> ⏳ [${(event as any).index}/${(event as any).total}] ${(event as any).action}: ${(event as any).detail}`, sessionId);
+            return;
+        }
+
+        if (event.type === 'command_auto_fixed') {
+            logAgentEvent(`> 🔧 Auto-fixed command: "${(event as any).original}" ➡️ "${(event as any).fixed}" (${(event as any).warning})`, sessionId);
+            return;
+        }
+
+        if (event.type === 'batch_complete') {
+            logAgentEvent(`> 📦 Batch: ${(event as any).succeeded}/${(event as any).total} actions succeeded`, sessionId);
+            void refreshSandbox(sessionId);
+            return;
+        }
+        // ── Custom process and command monitoring events ──────────
+        if (event.type === 'process_start') {
+            store.setActiveCommand((event as any).command || '', sessionId);
+            store.setActiveCommandStart(Date.now(), sessionId);
+            store.setActiveCommandPid(null, sessionId);
+            return;
+        }
+        if (event.type === 'process_end') {
+            store.setActiveCommand(null, sessionId);
+            store.setActiveCommandStart(null, sessionId);
+            store.setActiveCommandPid(null, sessionId);
+            return;
+        }
+        if (event.type === 'foreground_pid') {
+            store.setActiveCommandPid((event as any).pid || null, sessionId);
+            return;
+        }
+        if (event.type === 'process_list') {
+            store.setActiveProcesses((event as any).processes || [], sessionId);
+            if ((event as any).foreground_process) {
+                store.setForegroundProcess((event as any).foreground_process, sessionId);
+            } else {
+                store.setForegroundProcess(null, sessionId);
+            }
+            return;
+        }
+        if (event.type === 'agent_cancelled') {
+            store.setAgentTaskStatus('idle', sessionId);
+            return;
+        }
+
+        // ── Agent log events (command summaries → Agent Terminal) ────────
+        if (event.type === 'agent_log') {
+            const data = (event as any).data || '';
+            store.appendInteractiveOutput(data, sessionId);
+            return;
+        }
+
+        // ── Interactive terminal events ───────────────────────────────
+        if (event.type === 'interactive_output') {
+            const data = (event as any).data || '';
+            // Route raw command output to App Logs terminal (not Agent Terminal)
+            store.appendAppLog(data, sessionId);
+            store.addLog(data, sessionId);
+            return;
+        }
+
+        if (event.type === 'interactive_waiting') {
+            const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '').trim();
+            const promptText = stripAnsi((event as any).prompt || '');
+            const contextText = stripAnsi((event as any).context || '');
+            const commandText = stripAnsi((event as any).command || '');
+            const certain = (event as any).certain !== false;
+            const options = ((event as any).options || []) as { label: string; selected: boolean }[];
+
+            // Skip duplicate notifications for the same prompt
+            const existing = useAgentStore.getState().interactiveBySession[sessionId];
+            if (existing?.active && existing.prompt === promptText) return;
+
+            store.setInteractive(true, sessionId, { prompt: promptText, command: commandText, certain, options });
+
+            const parts: string[] = [];
+            parts.push(certain
+                ? '⌨ **The running command is asking you a question:**'
+                : '⌨ **The running command has stalled — it may be waiting for input:**');
+            if (commandText) parts.push(`Command: \`${commandText}\``);
+            parts.push('```\n' + (promptText || contextText || '(no prompt text captured)') + '\n```');
+            parts.push(options.length >= 2
+                ? '👉 Click one of the **option buttons** in the **Agent Terminal** panel below to choose.'
+                : '👉 Type your answer in the **amber input box** in the **Agent Terminal** panel below (or press Enter there to accept the default).');
+            store.addMessage({ role: 'system', content: parts.join('\n') }, sessionId);
+            logAgentEvent(`\r\n\x1b[33m⌨ Command is waiting for your input:\x1b[0m\r\n${promptText || contextText}\r\n`, sessionId);
+            return;
+        }
+
+        if (event.type === 'interactive_done') {
+            store.clearInteractive(sessionId);
+            return;
+        }
+
+        // Skip text_chunk and action_open/close for non-write actions
+        if (event.type === 'text_chunk' || event.type === 'action_open' || event.type === 'action_close' || event.type === 'action_chunk') {
+            return;
+        }
+
         store.addEvent(event, sessionId);
+
+        // ── Log node transitions to the interactive terminal ──────────────
+        if (event.type === 'on_chain_start' && event.node) {
+            const nodeLabels: Record<string, string> = {
+                plan_bootstrap: '📋 Planning architecture...',
+                plan_detail: '📝 Generating file-level plan...',
+                setup_environment: '🔧 Setting up environment...',
+                implement: '🔨 Implementing code...',
+                execute: '🔨 Executing node...',
+                validate: '✅ Validating output...',
+                judge: '⚖️ Reviewing plan quality...',
+                research: '🔍 Researching solutions...',
+            };
+            const label = nodeLabels[event.node];
+            if (label) {
+                logAgentEvent(`> ${label}`, sessionId);
+            }
+
+            // Update agent task status based on current node
+            if (['plan_bootstrap', 'plan_detail', 'research', 'judge', 'setup_environment'].includes(event.node)) {
+                store.setAgentTaskStatus('planning', sessionId);
+            } else if (event.node === 'implement') {
+                store.setAgentTaskStatus('writing', sessionId);
+            } else if (event.node === 'execute') {
+                store.setAgentTaskStatus('testing', sessionId);
+            } else if (event.node === 'validate') {
+                store.setAgentTaskStatus('validating', sessionId);
+            }
+        }
 
         if (event.type === 'on_chat_model_stream') {
             if (!event.chunk) return;
@@ -107,13 +293,23 @@ export function useAgentStream() {
             return;
         }
 
-        if (event.type === 'error') {
-            const errorMsg = event.data?.message || event.chunk || (event as any).message || (event as any).error || 'An unknown error occurred';
-            store.addLog(`> ❌ Error: ${errorMsg}`, sessionId);
-            store.addMessage({ role: 'agent', content: `❌ **Error**: ${errorMsg}` }, sessionId);
-            store.setStatus('error');
+        if (event.type === 'observability_log') {
+            const logData = (event as any).log;
+            if (logData) {
+                store.addObservabilityLog(logData, sessionId);
+            }
             return;
         }
+
+        if (event.type === 'error') {
+            const errorMsg = event.data?.message || event.chunk || (event as any).message || (event as any).error || 'An unknown error occurred';
+            logAgentEvent(`> ❌ Error: ${errorMsg}`, sessionId);
+            store.addMessage({ role: 'agent', content: `❌ **Error**: ${errorMsg}` }, sessionId);
+            store.setStatus('error');
+            store.setAgentTaskStatus('idle', sessionId);
+            return;
+        }
+
 
         if (event.type === 'on_chain_end') {
             isReceivingStream.current = false;
@@ -134,14 +330,21 @@ export function useAgentStream() {
                 }
             }
 
+            if (event.node === 'architecture_plan') {
+                void store.fetchArchitecturalPlan(sessionId);
+            }
+
             const observation = output?.last_obs;
             if (observation) {
-                store.addLog(`> ${observation.output || JSON.stringify(observation)}`, sessionId);
+                logAgentEvent(`> ${observation.output || JSON.stringify(observation)}`, sessionId);
                 void refreshSandbox(sessionId);
             }
 
             if (output?.status) {
                 store.setStatus(output.status);
+                if (output.status === 'done' || output.status === 'error') {
+                    store.setAgentTaskStatus('idle', sessionId);
+                }
             }
 
             // Extract token usage from implement node output
@@ -179,7 +382,7 @@ export function useAgentStream() {
         if (event.type === 'on_tool_end' && event.node === 'execute') {
             const obs = event.data?.output;
             if (obs) {
-                store.addLog(`> [${new Date().toLocaleTimeString()}] ${JSON.stringify(obs)}`, sessionId);
+                logAgentEvent(`> [${new Date().toLocaleTimeString()}] ${JSON.stringify(obs)}`, sessionId);
                 void refreshSandbox(sessionId);
             }
         }
@@ -189,11 +392,18 @@ export function useAgentStream() {
         }
     }, [handleAgentContent, refreshSandbox]);
 
-    const openAndSend = useCallback((message: string, sessionId: string) => {
+    const openAndSend = useCallback((message: string, sessionId: string, action: 'start' | 'resume' = 'start') => {
         const store = useAgentStore.getState();
 
-        if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-            ws.current.close(1000);
+        if (ws.current) {
+            // Detach handlers BEFORE closing — a stale socket's onclose must
+            // never fire reconnect logic for an old session, and a stale
+            // CONNECTING socket must never send its old start message.
+            ws.current.onopen = null;
+            ws.current.onmessage = null;
+            ws.current.onerror = null;
+            ws.current.onclose = null;
+            try { ws.current.close(1000); } catch { /* already closed */ }
         }
 
         if (reconnectTimer.current) {
@@ -205,25 +415,36 @@ export function useAgentStream() {
         store.setStatus('connecting');
         store.setError(null);
 
-        ws.current = new WebSocket(getWebSocketUrl());
+        const socket = new WebSocket(getWebSocketUrl());
+        ws.current = socket;
+        // Share the WebSocket reference via the store so any component
+        // (e.g. the Terminal) can send interactive input through it.
+        store.setAgentWs(socket);
 
-        ws.current.onopen = () => {
+        socket.onopen = () => {
+            if (ws.current !== socket) return; // superseded by a newer connection
             retryCount.current = 0;
             store.setConnectionState('open');
-            store.setStatus('planning');
+            store.setStatus(action === 'resume' ? 'running: resuming' : 'planning');
+            store.setAgentTaskStatus('planning', sessionId);
+            logAgentEvent(`> ⚡ Agent connected. ${action === 'resume' ? 'Resuming...' : 'Processing your request...'}`, sessionId);
             const lastSeqForSession = lastSeq.current[sessionId] || 0;
-            ws.current?.send(JSON.stringify({
+            socket.send(JSON.stringify({
                 session_id: sessionId,
+                action,
                 message,
+                chat_mode: store.chatModeBySession[sessionId] || 'build',
+                locked_files: store.lockedFilesBySession[sessionId] || [],
                 last_seq: lastSeqForSession,
             }));
         };
 
-        ws.current.onmessage = (e) => {
+        socket.onmessage = (e) => {
+            if (ws.current !== socket) return;
             try {
                 const event = JSON.parse(e.data) as LangGraphEvent;
                 if (event.type === 'ping') {
-                    ws.current?.send(JSON.stringify({
+                    socket.send(JSON.stringify({
                         type: 'pong',
                         ts: event.ts,
                         last_seq: lastSeq.current[sessionId] || 0,
@@ -233,24 +454,27 @@ export function useAgentStream() {
                 handleEvent(event, sessionId);
             } catch (error) {
                 store.setError('Failed to parse backend event');
-                store.addLog(`> Event parse error: ${error instanceof Error ? error.message : String(error)}`);
+                logAgentEvent(`> Event parse error: ${error instanceof Error ? error.message : String(error)}`, sessionId);
             }
         };
 
-        ws.current.onerror = () => {
+        socket.onerror = () => {
+            if (ws.current !== socket) return;
             store.setConnectionState('error');
             store.setStatus('error');
             store.setError('WebSocket error. Backend may be offline.');
         };
 
-        ws.current.onclose = (event) => {
+        socket.onclose = (event) => {
+            if (ws.current !== socket) return; // a newer connection took over
             store.setConnectionState(event.code === 1000 ? 'closed' : 'error');
+            store.setAgentWs(null);  // Clear shared WS reference
 
             if (event.code !== 1000) {
                 retryCount.current += 1;
                 const delay = Math.min(1000 * (2 ** (retryCount.current - 1)), 30000);
-                store.addLog(`> WebSocket closed unexpectedly. Reconnecting in ${Math.round(delay / 1000)}s...`, sessionId);
-                reconnectTimer.current = window.setTimeout(() => openAndSend(message, sessionId), delay);
+                logAgentEvent(`> WebSocket closed unexpectedly. Reconnecting in ${Math.round(delay / 1000)}s...`, sessionId);
+                reconnectTimer.current = window.setTimeout(() => openAndSend(message, sessionId, action), delay);
                 if (retryCount.current > 6) {
                     store.queuePending(message, sessionId);
                     store.setError('Message queued. Reconnect or send again when backend is ready.');
@@ -260,6 +484,10 @@ export function useAgentStream() {
 
             if (store.status !== 'error') {
                 store.setStatus('idle');
+                store.setAgentTaskStatus('idle', sessionId);
+                logAgentEvent(`> ✅ Agent task completed.`, sessionId);
+            } else {
+                store.setAgentTaskStatus('idle', sessionId);
             }
         };
     }, [handleEvent]);
@@ -268,14 +496,21 @@ export function useAgentStream() {
         const store = useAgentStore.getState();
         const sessionId = store.activeSessionId;
         store.addMessage({ role: 'user', content: message }, sessionId);
-        openAndSend(message, sessionId);
+        openAndSend(message, sessionId, 'start');
+    }, [openAndSend]);
+
+    const resume = useCallback(() => {
+        const store = useAgentStore.getState();
+        const sessionId = store.activeSessionId;
+        logAgentEvent(`> Resuming agent execution...`, sessionId);
+        openAndSend('', sessionId, 'resume');
     }, [openAndSend]);
 
     const retryPending = useCallback(() => {
         const store = useAgentStore.getState();
         const sessionId = store.activeSessionId;
         const message = store.popPending(sessionId);
-        if (message) openAndSend(message, sessionId);
+        if (message) openAndSend(message, sessionId, 'start');
     }, [openAndSend]);
 
     const stop = useCallback(() => {
@@ -289,8 +524,8 @@ export function useAgentStream() {
         }
         store.setStatus('idle');
         store.setConnectionState('closed');
-        store.addLog(`> Generation stopped by user.`, store.activeSessionId);
+        logAgentEvent(`> Generation stopped by user.`, store.activeSessionId);
     }, []);
 
-    return { send, retryPending, refreshSandbox, stop };
+    return { send, resume, retryPending, refreshSandbox, stop };
 }

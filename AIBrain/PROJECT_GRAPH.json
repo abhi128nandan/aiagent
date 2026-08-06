@@ -1,0 +1,137 @@
+{
+  "_schema_version": "1.0",
+  "_description": "Source of truth for myaiagent project. Read by any AI agent.",
+  "_instructions": "Update this file when adding new components, APIs, or files.",
+
+  "project": {
+    "name": "myaiagent",
+    "root": "/media/aashikant/GAME Volume/aicode/myaiagent",
+    "entry_point": "AIBrain/AGENTS.md"
+  },
+
+  "features": {
+    "TwoPhasePlanning": {
+      "status": "complete",
+      "doc": "AIBrain/FEATURES/AgentWorkflow.md",
+      "files": [
+        "backend/agent/graph.py",
+        "backend/agent/nodes.py",
+        "backend/agent/prompts.py",
+        "backend/agent/state.py",
+        "backend/agent/state_manager.py"
+      ],
+      "depends_on": ["AgentWorkflow", "ContextAndMemorySystem"]
+    },
+    "BidirectionalTerminalProxy": {
+      "status": "complete",
+      "doc": "AIBrain/FEATURES/BidirectionalTerminalProxy.md",
+      "files": [
+        "backend/runtime.py",
+        "backend/routes/agent.py",
+        "frontend/src/store/agentStore.ts",
+        "frontend/src/hooks/useAgentStream.ts",
+        "frontend/src/components/Terminal.tsx",
+        "frontend/src/components/Chat.tsx"
+      ],
+      "depends_on": ["DockerSandboxLifecycle"]
+    },
+    "DockerSandboxLifecycle": {
+      "status": "complete",
+      "doc": "AIBrain/FEATURES/DockerSandboxLifecycle.md",
+      "files": [
+        "backend/services/sandbox_service.py",
+        "backend/runtime.py"
+      ],
+      "depends_on": []
+    },
+    "AgentWorkflow": {
+      "status": "complete",
+      "doc": "AIBrain/FEATURES/AgentWorkflow.md",
+      "files": [
+        "backend/agent/graph.py",
+        "backend/agent/nodes.py",
+        "backend/agent/prompts.py",
+        "backend/agent/state.py",
+        "backend/agent/state_manager.py"
+      ],
+      "depends_on": ["BidirectionalTerminalProxy", "ContextAndMemorySystem", "LLMAndRateLimiting"]
+    },
+    "ContextAndMemorySystem": {
+      "status": "complete",
+      "doc": "AIBrain/FEATURES/ContextAndMemorySystem.md",
+      "files": [
+        "backend/agent/workspace_indexer.py",
+        "backend/agent/workspace_context.py",
+        "backend/agent/memory.py",
+        "backend/agent/file_history.py"
+      ],
+      "depends_on": []
+    },
+    "LLMAndRateLimiting": {
+      "status": "complete",
+      "doc": "AIBrain/FEATURES/LLMAndRateLimiting.md",
+      "files": [
+        "backend/agent/rate_limited_llm.py",
+        "backend/agent/groq_key_pool.py"
+      ],
+      "depends_on": []
+    },
+    "WebResearchEngine": {
+      "status": "complete",
+      "doc": "AIBrain/FEATURES/WebResearchEngine.md",
+      "files": [
+        "backend/agent/web_search.py",
+        "backend/agent/research_node.py"
+      ],
+      "depends_on": ["LLMAndRateLimiting"]
+    },
+    "FrontendIDE": {
+      "status": "complete",
+      "doc": "AIBrain/FEATURES/FrontendIDE.md",
+      "files": [
+        "frontend/src/components/MonacoEditor.tsx",
+        "frontend/src/components/FileBrowser.tsx",
+        "frontend/src/components/Chat.tsx",
+        "frontend/src/components/ObservabilityDashboard.tsx",
+        "frontend/src/components/Terminal.tsx"
+      ],
+      "depends_on": []
+    }
+  },
+
+  "components": {
+    "backend": {
+      "framework": "FastAPI",
+      "entry": "backend/main.py",
+      "agent_framework": "LangGraph",
+      "llm_provider": "Groq (free API)"
+    },
+    "frontend": {
+      "framework": "React",
+      "state_management": "Zustand",
+      "entry": "frontend/src/main.tsx"
+    },
+    "infra": {
+      "containerization": "Docker Compose",
+      "config": "docker-compose.yml"
+    }
+  },
+
+  "decisions": [
+    {
+      "id": "0001",
+      "title": "Shared WebSocket + Zustand store",
+      "doc": "AIBrain/DECISIONS/0001-shared-websocket-zustand-store.md"
+    },
+    {
+      "id": "0002",
+      "title": "Async pexpect polling",
+      "doc": "AIBrain/DECISIONS/0002-async-pexpect-polling.md"
+    },
+    {
+      "id": "0003",
+      "title": "Two-phase planning (bootstrap → detail)",
+      "doc": "AIBrain/DECISIONS/0003-two-phase-planning.md"
+    }
+  ]
+}

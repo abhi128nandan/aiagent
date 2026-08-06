@@ -7,11 +7,18 @@ class BaseAction(BaseModel):
 class CmdRunAction(BaseAction):
     type: Literal['run'] = 'run'
     command: str
+    is_hidden: bool = False
 
 class FileWriteAction(BaseAction):
     type: Literal['write'] = 'write'
     path: str
     content: str
+
+class FileReplaceAction(BaseAction):
+    type: Literal['replace'] = 'replace'
+    path: str
+    target_content: str
+    replacement_content: str
 
 class FileReadAction(BaseAction):
     type: Literal['read'] = 'read'
@@ -35,7 +42,7 @@ class UnknownAction(BaseAction):
     content: str
 
 # Union type for all possible actions
-ActionType = Union[CmdRunAction, FileWriteAction, FileReadAction, FinishAction, BrowserAction, WebSearchAction, UnknownAction]
+ActionType = Union[CmdRunAction, FileWriteAction, FileReplaceAction, FileReadAction, FinishAction, BrowserAction, WebSearchAction, UnknownAction]
 
 
 class BaseObservation(BaseModel):

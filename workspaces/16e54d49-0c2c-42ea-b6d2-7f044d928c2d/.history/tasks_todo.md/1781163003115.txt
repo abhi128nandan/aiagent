@@ -1,0 +1,34 @@
+# Project: calculator
+
+## Description
+A simple calculator application built with React using Vite
+
+## Tasks Checklist
+
+- [ ] **MODIFY** `src/App.jsx`
+  *Description:* Replace the default Vite React boilerplate with the calculator layout: add a Calculator component import, display screen, number buttons, operator buttons, and equals button. Set up React state for calculator display using useState.
+
+- [ ] **CREATE** `src/components/Calculator.jsx`
+  *Description:* Create a Calculator component with a display screen, number buttons, operator buttons, and equals button. Implement logic for handling button clicks, performing calculations, and updating the display screen.
+
+- [ ] **CREATE** `src/components/DisplayScreen.jsx`
+  *Description:* Create a DisplayScreen component to display the current calculation and result. Use React state to update the display screen when the user interacts with the calculator.
+
+- [ ] **CREATE** `src/components/NumberButton.jsx`
+  *Description:* Create a NumberButton component to handle number button clicks. Implement logic to append the clicked number to the current calculation and update the display screen.
+
+- [ ] **CREATE** `src/components/OperatorButton.jsx`
+  *Description:* Create an OperatorButton component to handle operator button clicks. Implement logic to perform the selected operation and update the display screen.
+
+- [ ] **CREATE** `src/components/EqualsButton.jsx`
+  *Description:* Create an EqualsButton component to handle equals button clicks. Implement logic to calculate the result of the current calculation and update the display screen.
+
+- [ ] **MODIFY** `src/index.css`
+  *Description:* Replace default Vite styles with calculator-specific CSS: layout, button styles, display screen styles, and font styles.
+
+- [ ] **MODIFY** `src/main.jsx`
+  *Description:* Update the main.jsx file to render the Calculator component.
+
+- [ ] **MODIFY** `package.json`
+  *Description:* Update the package.json file to include any additional dependencies required for the calculator application.
+

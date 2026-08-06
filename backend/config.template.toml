@@ -48,3 +48,9 @@ SANDBOX_TIMEOUT = 30
 SECRETS_FERNET_KEY = ""
 SECRETS_TEST_TIMEOUT = 5
 API_AUTH_TOKEN = ""
+
+[langsmith]
+LANGCHAIN_TRACING_V2 = false
+LANGCHAIN_API_KEY = ""
+LANGCHAIN_PROJECT = "ai-agent-builder"
+LANGCHAIN_ENDPOINT = "https://api.smith.langchain.com"

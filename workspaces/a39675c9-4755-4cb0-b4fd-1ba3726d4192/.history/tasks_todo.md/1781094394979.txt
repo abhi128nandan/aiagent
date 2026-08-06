@@ -1,0 +1,34 @@
+# Project: my-app
+
+## Description
+A simple ecommerce website
+
+## Tasks Checklist
+
+- [x] **MODIFY** `src/App.jsx`
+  *Description:* Replace the default Vite React boilerplate with the application layout: add a Navbar component import, product grid section, shopping cart sidebar, and footer. Set up React state for cart items using useState.
+
+- [ ] **CREATE** `src/components/Navbar.jsx`
+  *Description:* Create a responsive navigation bar with logo, search input, cart icon with item count badge, and navigation links.
+
+- [x] **MODIFY** `src/index.css`
+  *Description:* Replace default Vite styles with application-specific CSS: color variables, responsive grid layout, card styles, animations.
+
+- [ ] **CREATE** `src/components/ProductGrid.jsx`
+  *Description:* Create a component to display the product grid. Each product should be represented by a card with an image, title, price, and 'Add to Cart' button. Use React state to manage product data.
+
+- [ ] **CREATE** `src/components/CartSidebar.jsx`
+  *Description:* Create a sidebar component for the shopping cart. Display items in the cart with quantities and total price. Include buttons to update quantities and remove items.
+
+- [x] **MODIFY** `src/App.css`
+  *Description:* Add specific styles for the product grid, cart sidebar, and other UI elements. Ensure responsiveness across different screen sizes.
+
+- [ ] **CREATE** `src/components/ProductCard.jsx`
+  *Description:* Create a component to display individual products in the grid. Each card should include an image, title, price, and 'Add to Cart' button. Use React state to manage product data.
+
+- [ ] **CREATE** `src/components/CartItem.jsx`
+  *Description:* Create a component to display individual items in the cart. Each item should include an image, title, price, quantity, and 'Remove' button. Use React state to manage cart data.
+
+- [x] **MODIFY** `src/App.jsx`
+  *Description:* Integrate all components into the main App component. Ensure proper routing if using react-router-dom for navigation between pages.
+

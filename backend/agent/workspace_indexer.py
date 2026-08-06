@@ -10,16 +10,23 @@ Architecture (from AUTONOMOUS_AI_AGENT_ARCHITECTURE.md §6):
 """
 from __future__ import annotations
 
+import ast as _ast
+import hashlib
 import os
 import re
 import json
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 from pathlib import Path
 
 from core.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def compute_file_hash(content: str) -> str:
+    """Compute SHA256 hash of file content for incremental change detection."""
+    return hashlib.sha256(content.encode("utf-8", errors="replace")).hexdigest()[:16]
 
 
 # ── File classification ────────────────────────────────────────────────
@@ -82,6 +89,21 @@ KEY_FILES = {
 
 
 @dataclass
+class SymbolInfo:
+    """A code symbol (class, function, variable) extracted from a file."""
+    name: str
+    symbol_type: str  # 'class', 'function', 'variable', 'constant'
+    line_start: int = 0
+    line_end: int = 0
+    docstring: str = ""
+    decorators: List[str] = field(default_factory=list)
+    bases: List[str] = field(default_factory=list)  # For classes: parent classes
+    parameters: List[str] = field(default_factory=list)  # For functions: param names
+    is_async: bool = False
+    is_exported: bool = False
+
+
+@dataclass
 class FileInfo:
     """Metadata about a single file in the workspace."""
     path: str
@@ -89,6 +111,8 @@ class FileInfo:
     size: int = 0
     imports: List[str] = field(default_factory=list)
     exports: List[str] = field(default_factory=list)
+    symbols: List[SymbolInfo] = field(default_factory=list)
+    content_hash: str = ""  # SHA256 for incremental change detection
     is_key_file: bool = False
 
 
@@ -258,6 +282,8 @@ class WorkspaceIndexer:
                             content = f.read()
                         info.imports = self._extract_imports(content, file_type)
                         info.exports = self._extract_exports(content, file_type)
+                        info.symbols = self._extract_symbols(content, file_type)
+                        info.content_hash = compute_file_hash(content)
                     except Exception:
                         pass
 
@@ -304,6 +330,140 @@ class WorkspaceIndexer:
                 exports.append(match.group(1))
 
         return exports[:20]  # Limit to prevent bloat
+
+    def _extract_symbols(self, content: str, file_type: str) -> List[SymbolInfo]:
+        """Extract code symbols (classes, functions, variables) from source files."""
+        if file_type == "python":
+            return self._extract_python_symbols(content)
+        elif file_type in ("javascript", "typescript", "javascript_react", "typescript_react"):
+            return self._extract_js_symbols(content)
+        return []
+
+    def _extract_python_symbols(self, content: str) -> List[SymbolInfo]:
+        """Extract symbols from Python files using the stdlib AST parser."""
+        symbols: List[SymbolInfo] = []
+        try:
+            tree = _ast.parse(content)
+        except SyntaxError:
+            return symbols
+
+        for node in _ast.iter_child_nodes(tree):
+            if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+                docstring = _ast.get_docstring(node) or ""
+                decorators = []
+                for dec in node.decorator_list:
+                    if isinstance(dec, _ast.Name):
+                        decorators.append(dec.id)
+                    elif isinstance(dec, _ast.Attribute):
+                        decorators.append(f"{getattr(dec.value, 'id', '?')}.{dec.attr}")
+                params = [
+                    arg.arg for arg in node.args.args
+                    if arg.arg != "self" and arg.arg != "cls"
+                ]
+                symbols.append(SymbolInfo(
+                    name=node.name,
+                    symbol_type="function",
+                    line_start=node.lineno,
+                    line_end=node.end_lineno or node.lineno,
+                    docstring=docstring[:200],
+                    decorators=decorators,
+                    parameters=params[:10],
+                    is_async=isinstance(node, _ast.AsyncFunctionDef),
+                    is_exported=not node.name.startswith("_"),
+                ))
+            elif isinstance(node, _ast.ClassDef):
+                docstring = _ast.get_docstring(node) or ""
+                bases = []
+                for base in node.bases:
+                    if isinstance(base, _ast.Name):
+                        bases.append(base.id)
+                    elif isinstance(base, _ast.Attribute):
+                        bases.append(f"{getattr(base.value, 'id', '?')}.{base.attr}")
+                decorators = []
+                for dec in node.decorator_list:
+                    if isinstance(dec, _ast.Name):
+                        decorators.append(dec.id)
+                symbols.append(SymbolInfo(
+                    name=node.name,
+                    symbol_type="class",
+                    line_start=node.lineno,
+                    line_end=node.end_lineno or node.lineno,
+                    docstring=docstring[:200],
+                    decorators=decorators,
+                    bases=bases,
+                    is_exported=not node.name.startswith("_"),
+                ))
+            elif isinstance(node, _ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, _ast.Name) and target.id.isupper():
+                        symbols.append(SymbolInfo(
+                            name=target.id,
+                            symbol_type="constant",
+                            line_start=node.lineno,
+                            line_end=node.end_lineno or node.lineno,
+                            is_exported=not target.id.startswith("_"),
+                        ))
+
+        return symbols[:100]  # Cap to prevent memory bloat
+
+    def _extract_js_symbols(self, content: str) -> List[SymbolInfo]:
+        """Extract symbols from JS/TS files using regex (lightweight, no JS engine needed)."""
+        symbols: List[SymbolInfo] = []
+
+        # Functions: export? (async)? function name(
+        for match in re.finditer(
+            r'^(?:export\s+(?:default\s+)?)?'
+            r'(async\s+)?function\s+(\w+)\s*\(',
+            content, re.MULTILINE
+        ):
+            symbols.append(SymbolInfo(
+                name=match.group(2),
+                symbol_type="function",
+                line_start=content[:match.start()].count('\n') + 1,
+                is_async=bool(match.group(1)),
+                is_exported='export' in content[max(0, match.start() - 20):match.start() + 10],
+            ))
+
+        # Arrow functions: export? const name = (async)? (...) =>
+        for match in re.finditer(
+            r'(?:export\s+(?:default\s+)?)?(?:const|let|var)\s+(\w+)\s*=\s*(async\s+)?(?:\([^)]*\)|[a-zA-Z_]\w*)\s*=>',
+            content, re.MULTILINE
+        ):
+            symbols.append(SymbolInfo(
+                name=match.group(1),
+                symbol_type="function",
+                line_start=content[:match.start()].count('\n') + 1,
+                is_async=bool(match.group(2)),
+                is_exported='export' in content[max(0, match.start() - 20):match.start() + 10],
+            ))
+
+        # Classes: export? class Name (extends Base)?
+        for match in re.finditer(
+            r'(?:export\s+(?:default\s+)?)?class\s+(\w+)(?:\s+extends\s+(\w+))?',
+            content, re.MULTILINE
+        ):
+            bases = [match.group(2)] if match.group(2) else []
+            symbols.append(SymbolInfo(
+                name=match.group(1),
+                symbol_type="class",
+                line_start=content[:match.start()].count('\n') + 1,
+                bases=bases,
+                is_exported='export' in content[max(0, match.start() - 20):match.start() + 10],
+            ))
+
+        # Interfaces / Types (TypeScript): export? interface/type Name
+        for match in re.finditer(
+            r'(?:export\s+)?(?:interface|type)\s+(\w+)',
+            content, re.MULTILINE
+        ):
+            symbols.append(SymbolInfo(
+                name=match.group(1),
+                symbol_type="interface",
+                line_start=content[:match.start()].count('\n') + 1,
+                is_exported='export' in content[max(0, match.start() - 20):match.start() + 10],
+            ))
+
+        return symbols[:100]
 
     def _parse_dependencies(self, idx: WorkspaceIndex) -> None:
         """Parse dependency files (package.json, requirements.txt, etc.)."""
@@ -520,4 +680,84 @@ class WorkspaceIndexer:
             tree_lines = idx.structure_tree.split("\n")[:30]
             parts.append(f"\n  Directory Tree:\n" + "\n".join(f"    {l}" for l in tree_lines))
 
+        return "\n".join(parts)
+
+    def get_ranked_context(
+        self,
+        idx: WorkspaceIndex,
+        plan_files: List[str] = None,
+        error_file: str = None,
+        query: str = None,
+        max_tokens: int = 4000
+    ) -> str:
+        """
+        Collects, ranks, and fits workspace files into a token budget.
+        
+        Ranks files by relevance:
+        1. Error file (the file that caused the last compilation/runtime crash)
+        2. Plan files (files the agent is scheduled to work on)
+        3. Entry points / Key files (app.js, server.py, etc.)
+        4. Query-relevant files (if they match keywords in user requests)
+        
+        Token budget manager ensures we only embed file contents up to max_tokens limit.
+        """
+        summary = self.summarize(idx)
+        ranked_files = []
+        
+        clean_plan_files = [p.strip().lstrip("/") for p in (plan_files or [])]
+        clean_error_file = error_file.strip().lstrip("/") if error_file else None
+        if clean_error_file and "workspace/" in clean_error_file:
+            clean_error_file = clean_error_file.split("workspace/", 1)[-1]
+            
+        for file_info in idx.files:
+            rel_path = file_info.path
+            score = 0
+            
+            if clean_error_file and (clean_error_file in rel_path or rel_path in clean_error_file):
+                score += 1000
+            if any(pf in rel_path or rel_path in pf for pf in clean_plan_files):
+                score += 500
+            if rel_path in idx.entry_points:
+                score += 200
+            if file_info.is_key_file:
+                score += 100
+            if query:
+                keywords = [k.lower() for k in re.findall(r"\w+", query) if len(k) > 3]
+                for kw in keywords:
+                    if kw in rel_path.lower() or kw in file_info.file_type.lower():
+                        score += 50
+                        
+            if score > 0:
+                ranked_files.append((score, file_info))
+                
+        ranked_files.sort(key=lambda x: x[0], reverse=True)
+        
+        budget_chars = max_tokens * 4
+        current_chars = len(summary)
+        embedded_files = []
+        
+        for score, file_info in ranked_files:
+            filepath = os.path.join(self.root, file_info.path)
+            if not os.path.exists(filepath):
+                continue
+            if file_info.size > 100_000:
+                continue
+            try:
+                with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+            except Exception:
+                continue
+                
+            file_block = f"\n\n=========================================\nFILE: {file_info.path}\n=========================================\n{content}"
+            block_len = len(file_block)
+            
+            if current_chars + block_len <= budget_chars:
+                embedded_files.append(file_block)
+                current_chars += block_len
+                
+        parts = [summary]
+        if embedded_files:
+            parts.append("\n\nRELEVANT FILE CONTENTS (EMBEDDED CONTEXT):")
+            parts.extend(embedded_files)
+            
         return "\n".join(parts)

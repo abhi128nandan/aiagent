@@ -1,0 +1,16 @@
+# Project: my-app
+
+## Description
+A simple ecommerce website
+
+## Tasks Checklist
+
+- [x] **MODIFY** `src/App.jsx`
+  *Description:* Replace the default Vite React boilerplate with the application layout: import and render the Navbar component, add a product grid section, shopping cart sidebar, and footer. Set up React state for cart items using useState.
+
+- [ ] **CREATE** `src/components/Navbar.jsx`
+  *Description:* Create a responsive navigation bar with logo, search input, cart icon with item count badge, and navigation links.
+
+- [x] **MODIFY** `src/index.css`
+  *Description:* Replace default Vite styles with application-specific CSS: color variables, responsive grid layout, card styles, animations.
+

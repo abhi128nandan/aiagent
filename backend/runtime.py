@@ -22,16 +22,42 @@ import asyncio
 import redis
 import httpx
 from enum import Enum
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, cast
 from pydantic import BaseModel
 
-from agent.schema import CmdRunAction, FileWriteAction, FileReadAction, BrowserAction, ActionType
+from agent.schema import CmdRunAction, FileWriteAction, FileReplaceAction, FileReadAction, BrowserAction, ActionType
 from browser import PlaywrightManager
 from core.config import get_settings
 from core.logger import get_logger
 
 settings = get_settings()
 logger = get_logger(__name__)
+
+
+# ── Interactive input queues (for bidirectional terminal proxy) ──────────
+# Maps session_id -> asyncio.Queue that receives user keystrokes from the
+# frontend WebSocket and feeds them into the running pexpect shell.
+
+_interactive_input_queues: Dict[str, asyncio.Queue] = {}
+
+
+def get_interactive_queue(session_id: str) -> asyncio.Queue:
+    """Get or create the interactive input queue for a session."""
+    if session_id not in _interactive_input_queues:
+        _interactive_input_queues[session_id] = asyncio.Queue()
+    return _interactive_input_queues[session_id]
+
+
+def send_interactive_input(session_id: str, data: str) -> None:
+    """Push user input into the interactive queue (called from WebSocket handler)."""
+    q = get_interactive_queue(session_id)
+    q.put_nowait(data)
+    logger.debug("interactive_input_queued", session_id=session_id, data_len=len(data))
+
+
+def cleanup_interactive_queue(session_id: str) -> None:
+    """Remove the interactive queue for a session."""
+    _interactive_input_queues.pop(session_id, None)
 
 
 # ── Redis singleton ─────────────────────────────────────────────────────
@@ -98,6 +124,179 @@ _DOCKER_STATUS_MAP = {
     'dead': SandboxStatus.ERROR,
 }
 
+# ── CLI prompt auto-responder ───────────────────────────────────────────
+
+# Selection-menu markers used by prompts/clack/inquirer-style CLIs
+_MENU_MARKER_RE = re_mod.compile(r'^([●○◯❯›▸])\s*(.+)$')
+# Box-drawing characters clack/prompts draw before each option line,
+# e.g. "│  ● Cancel operation"
+_MENU_BOX_PREFIX = '│┃|◆◇┌└├─ \t'
+# Safe choices, in preference order, for unattended scaffolding
+_MENU_PREFERRED_OPTIONS = (
+    'ignore files and continue',
+    'remove existing files and continue',
+    'yes',
+    'continue',
+    'proceed',
+)
+
+
+def _parse_menu_options(text: str) -> list[dict]:
+    """
+    Extract selection-menu options from CLI output.
+
+    Returns [{'label': str, 'selected': bool}, ...] in display order.
+    Handles clack-style box prefixes ("│  ● Cancel operation").
+
+    TUIs REDRAW the menu on every keypress, so the output buffer contains
+    multiple stale frames stacked on top of each other. Walk backwards from
+    the end and stop at the first repeated label — that isolates the LAST
+    (current) frame, whose highlighted option reflects the real cursor.
+    """
+    options_rev: list[dict] = []
+    seen: set[str] = set()
+    for raw_line in reversed(text.splitlines()):
+        line = raw_line.strip().lstrip(_MENU_BOX_PREFIX).strip()
+        m = _MENU_MARKER_RE.match(line)
+        if m:
+            label = m.group(2).strip()
+            if label.lower() in seen:
+                break  # reached a stale frame above
+            seen.add(label.lower())
+            options_rev.append({
+                'label': label,
+                'selected': m.group(1) in ('●', '❯', '›', '▸'),
+            })
+        elif options_rev and line:
+            break  # non-option line above the option block
+    return list(reversed(options_rev))
+
+
+def _menu_answer_for_index(options: list[dict], target_idx: int) -> str:
+    """
+    Arrow-key sequence that moves from the highlighted option to target_idx.
+
+    NOTE: Enter must be '\\r' (carriage return) — raw-mode TUIs (clack,
+    inquirer, prompts) do NOT recognize '\\n' as Enter; sending '\\n' just
+    makes them redraw the menu forever.
+    """
+    selected_idx = next((i for i, o in enumerate(options) if o['selected']), 0)
+    delta = target_idx - selected_idx
+    if delta >= 0:
+        return '\x1b[B' * delta + '\r'   # arrow down × delta, then Enter
+    return '\x1b[A' * (-delta) + '\r'    # arrow up × |delta|, then Enter
+
+
+def _detect_menu_answer(text: str) -> Optional[str]:
+    """
+    Handle radio/arrow-key selection menus (e.g. create-vite's
+    "Current directory is not empty" menu).
+
+    Typing 'y' does NOTHING in these menus, and plain Enter selects the
+    highlighted option — which for create-vite is "Cancel operation".
+    Instead, parse the options, find a safe one, and navigate to it
+    with arrow-key escapes.
+
+    Returns the key sequence, or None if no recognizably safe option
+    exists (→ ask the user).
+    """
+    options = _parse_menu_options(text)
+    if len(options) < 2:
+        return None  # not a multi-option menu
+
+    for preferred in _MENU_PREFERRED_OPTIONS:
+        for i, option in enumerate(options):
+            if preferred in option['label'].lower():
+                return _menu_answer_for_index(options, i)
+
+    return None  # unknown menu → let the user decide
+
+
+def _detect_cli_prompt(text: str) -> Optional[str]:
+    """
+    Detect common CLI prompts and return the auto-answer.
+
+    Returns the string to send (e.g. '\\n' for Enter, 'y\\n' for yes),
+    or None if the prompt is unknown and the user should be asked.
+
+    Covers:
+    - y/N and Y/n confirmation prompts
+    - "Ok to proceed? (y)" (npx)
+    - "Need to install ... proceed?" (npx)
+    - "Select a framework" / arrow-key menus (navigate to safe option)
+    - "Project name:" / "Package name:" (send Enter for default)
+    - "Overwrite?" / "Directory already contains files" (send Enter/y)
+    - "Do you want to continue? [Y/n]" (apt-get)
+    """
+    lower = text.lower()
+    last_line = text.strip().rsplit('\n', 1)[-1].strip()
+    last_lower = last_line.lower()
+
+    # ── Pattern 0: Radio/arrow-key menus MUST be handled first ───────
+    # ('y\n' answers are wrong for menus: Enter picks the highlighted
+    # option, which is often "Cancel operation".)
+    has_menu = any(marker in text[-600:] for marker in ('●', '○', '◯', '❯'))
+    if has_menu:
+        menu_answer = _detect_menu_answer(text[-600:])
+        if menu_answer is not None:
+            return menu_answer
+        # Framework/variant pickers: the highlighted default is fine
+        if re_mod.search(r'select\s+a\s+(?:framework|variant|template|preset)', lower):
+            return '\r'
+        return None  # unknown menu — never blind-'y' it; ask the user
+
+    # ── Pattern 1: npx "Ok to proceed?" / "Need to install" ──────────
+    if 'ok to proceed' in lower or 'need to install' in lower:
+        return 'y\r'
+
+    # ── Pattern 2: Explicit (y/N) or (Y/n) at end of line ────────────
+    if re_mod.search(r'\(y/n\)|\(Y/n\)|\(y/N\)|\[y/N\]|\[Y/n\]|\[yes/no\]', last_line):
+        # Default to "yes" for most CI-style prompts
+        return 'y\r'
+
+    # ── Pattern 3: "? ... (Y/n)" or "? ... (y)" ─────────────────────
+    if last_lower.rstrip().endswith('(y)') or last_lower.rstrip().endswith('[y]'):
+        return '\r'  # Just press Enter for default=yes
+
+    # ── Pattern 4: "Do you want to continue?" (apt-get, npm) ─────────
+    if 'do you want to continue' in lower or 'do you wish to continue' in lower:
+        return 'y\r'
+
+    # ── Pattern 5: "Overwrite?" / "already exists" ───────────────────
+    if 'overwrite' in lower or 'already exists' in lower or 'directory is not empty' in lower:
+        return 'y\r'
+
+    # ── Pattern 6: "Project name:" / "Package name:" (Enter=default) ─
+    if re_mod.search(r'(?:project|package|app)\s*name\s*[:?›»]', last_lower):
+        return '\r'
+
+    # ── Pattern 7: "Select a framework:" / "Select a variant:" ───────
+    if re_mod.search(r'select\s+a\s+(?:framework|variant|template|preset)', last_lower):
+        return '\r'  # Accept the default (first option)
+
+    # ── Pattern 8: Arrow-key selection menus (❯, ›, ▸, >) ────────────
+    if re_mod.search(r'[❯›▸>]\s+\S+', last_line) and '?' in text[-200:]:
+        return '\r'  # Accept highlighted default
+
+    # ── Pattern 9: "Would you like to ...?" generic ──────────────────
+    if 'would you like to' in lower and '?' in last_line:
+        return '\r'
+
+    # ── Pattern 10: "Press enter to continue" ────────────────────────
+    if 'press enter' in lower or 'press return' in lower:
+        return '\r'
+
+    # ── Pattern 11: "Use TypeScript?" / "Use ESLint?" (Vite/CRA) ─────
+    if re_mod.search(r'use\s+\w+\s*\?', last_lower):
+        return '\r'  # Accept default
+
+    # ── Pattern 12: "Are you sure" ───────────────────────────────────
+    if 'are you sure' in lower:
+        return 'y\r'
+
+    # ── No match — let the user answer ───────────────────────────────
+    return None
+
 
 class DockerRuntime:
     """
@@ -140,7 +339,7 @@ class DockerRuntime:
 
         # 2. Redis lookup
         r = _get_redis()
-        stored = r.get(f"{cls.REDIS_KEY_PREFIX}{session_id}")
+        stored = cast(str, r.get(f"{cls.REDIS_KEY_PREFIX}{session_id}"))
         if stored:
             meta = json.loads(stored)
             container_name = meta.get("container_name")
@@ -182,13 +381,13 @@ class DockerRuntime:
     def _enforce_sandbox_limit(cls):
         """Pause oldest sandboxes if we've hit the limit."""
         r = _get_redis()
-        keys = r.keys(f"{cls.REDIS_KEY_PREFIX}*")
+        keys = cast(List[str], r.keys(f"{cls.REDIS_KEY_PREFIX}*"))
         if len(keys) < cls.MAX_SANDBOXES:
             return
 
         entries = []
         for key in keys:
-            raw = r.get(key)
+            raw = cast(str, r.get(key))
             if raw:
                 meta = json.loads(raw)
                 entries.append((key, meta))
@@ -210,7 +409,7 @@ class DockerRuntime:
     def cleanup_old(cls, max_age_seconds: int = 86400) -> int:
         """Remove sandboxes older than the max age."""
         r = _get_redis()
-        keys = r.keys(f"{cls.REDIS_KEY_PREFIX}*")
+        keys = cast(List[str], r.keys(f"{cls.REDIS_KEY_PREFIX}*"))
         if not keys:
             return 0
 
@@ -218,7 +417,7 @@ class DockerRuntime:
         client = docker.from_env()
         removed = 0
         for key in keys:
-            raw = r.get(key)
+            raw = cast(str, r.get(key))
             if not raw:
                 continue
             meta = json.loads(raw)
@@ -243,14 +442,14 @@ class DockerRuntime:
     def list_all(cls) -> List[SandboxInfo]:
         """List all tracked sandboxes from Redis and Docker."""
         r = _get_redis()
-        keys = r.keys(f"{cls.REDIS_KEY_PREFIX}*")
+        keys = cast(List[str], r.keys(f"{cls.REDIS_KEY_PREFIX}*"))
         sandboxes = []
         if not keys:
             return sandboxes
             
         client = docker.from_env()
         for key in keys:
-            raw = r.get(key)
+            raw = cast(str, r.get(key))
             if not raw:
                 continue
             meta = json.loads(raw)
@@ -364,8 +563,601 @@ class DockerRuntime:
             f'docker exec -it {self.container_name} /bin/bash',
             encoding='utf-8',
         )
-        self.shell.sendline('export PS1="[PROMPT_END]# "')
-        self.shell.expect('\\[PROMPT_END\\]# ', timeout=5)
+        self.shell_pid = None
+        try:
+            self.shell.sendline('export PS1="[PROMPT_END]# "')
+            self.shell.expect('\\[PROMPT_END\\]# ', timeout=5)
+            self.shell.sendline('cd /workspace')
+            self.shell.expect('\\[PROMPT_END\\]# ', timeout=5)
+            # Retrieve shell PID
+            self.shell.sendline('echo $$')
+            self.shell.expect('\\[PROMPT_END\\]# ', timeout=5)
+            lines = (self.shell.before or '').splitlines()
+            for line in lines:
+                cleaned = line.strip()
+                if cleaned.isdigit():
+                    self.shell_pid = int(cleaned)
+                    break
+        except (pexpect.TIMEOUT, pexpect.EOF) as e:
+            # A slow/stuck container shouldn't hard-fail session reattach —
+            # PS1 was still sent; command execution can usually proceed.
+            logger.warning(
+                "init_shell_prompt_timeout",
+                session_id=self.session_id,
+                error=type(e).__name__,
+            )
+
+    async def get_active_processes(self) -> List[Dict[str, Any]]:
+        loop = asyncio.get_event_loop()
+        def _get_ps():
+            try:
+                # 1) Try running ps command
+                res = self.container.exec_run("ps -eo pid,ppid,stat,args --no-headers")
+                if res.exit_code == 0:
+                    output = res.output.decode('utf-8', errors='ignore')
+                    processes = []
+                    for line in output.strip().splitlines():
+                        parts = line.strip().split(None, 3)
+                        if len(parts) >= 4:
+                            pid, ppid, stat, args = parts
+                            # Filter out system and ps processes
+                            if pid in ("1", "0") or "ps -eo" in args or "sleep infinity" in args:
+                                continue
+                            processes.append({
+                                "pid": int(pid),
+                                "ppid": int(ppid),
+                                "status": "Running" if "Z" not in stat else "Zombie",
+                                "command": args.strip()
+                            })
+                    return processes
+            except Exception as e:
+                logger.warning("ps_command_failed_falling_back_to_proc", session_id=self.session_id, error=str(e))
+
+            # 2) Fallback: run pure python script to parse /proc
+            try:
+                python_script = (
+                    "import os, json\n"
+                    "procs = []\n"
+                    "for name in os.listdir('/proc'):\n"
+                    "    if name.isdigit():\n"
+                    "        try:\n"
+                    "            pid = int(name)\n"
+                    "            with open(f'/proc/{pid}/stat', 'r') as f:\n"
+                    "                stat = f.read().split()\n"
+                    "            ppid = int(stat[3])\n"
+                    "            state = stat[2]\n"
+                    "            with open(f'/proc/{pid}/cmdline', 'r') as f:\n"
+                    "                cmdline = f.read().replace(\"\\x00\", \" \").strip()\n"
+                    "            if not cmdline:\n"
+                    "                cmdline = stat[1].strip('()')\n"
+                    "            if pid in (1, 0) or 'sleep infinity' in cmdline or 'python -c' in cmdline or 'python3 -c' in cmdline:\n"
+                    "                continue\n"
+                    "            procs.append({\n"
+                    "                'pid': pid,\n"
+                    "                'ppid': ppid,\n"
+                    "                'status': 'Zombie' if state == 'Z' else 'Running',\n"
+                    "                'command': cmdline\n"
+                    "            })\n"
+                    "        except Exception:\n"
+                    "            pass\n"
+                    "print(json.dumps(procs))"
+                )
+                res = self.container.exec_run(["python3", "-c", python_script])
+                if res.exit_code == 0:
+                    import json
+                    output = res.output.decode('utf-8', errors='ignore')
+                    return json.loads(output.strip())
+            except Exception as e:
+                logger.warning("get_active_processes_fallback_failed", session_id=self.session_id, error=str(e))
+
+            return []
+        return await loop.run_in_executor(None, _get_ps)
+
+    def get_foreground_process(self, processes: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if not getattr(self, 'shell_pid', None):
+            return None
+        # Find process whose PPID is self.shell_pid
+        for p in processes:
+            if p["ppid"] == self.shell_pid:
+                return p
+        return None
+
+    async def kill_process(self, pid: Optional[int], signal: int = 15) -> bool:
+        if not pid:
+            # If pid is missing/None, send control sequences to shell
+            # SIGINT (2) -> \x03, SIGTSTP (20) -> \x1a
+            if signal == 2:
+                self.shell.send('\x03')
+                return True
+            elif signal == 20:
+                self.shell.send('\x1a')
+                return True
+            elif signal == 9:
+                # Force kill without PID: close the shell itself!
+                if hasattr(self, 'shell') and self.shell.isalive():
+                    self.shell.close(force=True)
+                return True
+            return False
+
+        # Get active processes to find descendants
+        processes = await self.get_active_processes()
+        
+        # Build ppid map
+        from collections import defaultdict
+        ppid_to_pids = defaultdict(list)
+        for p in processes:
+            ppid_to_pids[p["ppid"]].append(p["pid"])
+            
+        # Find all descendants using DFS/BFS
+        to_kill = []
+        queue = [pid]
+        visited = set()
+        while queue:
+            curr = queue.pop(0)
+            if curr in visited:
+                continue
+            visited.add(curr)
+            # Add all children
+            children = ppid_to_pids.get(curr, [])
+            to_kill.extend(children)
+            queue.extend(children)
+            
+        # Reverse the order so we kill descendants from deepest first (leaf to root)
+        to_kill.reverse()
+        
+        # Also include the target pid itself
+        to_kill.append(pid)
+        
+        # Kill each PID
+        loop = asyncio.get_event_loop()
+        success = True
+        for p_id in to_kill:
+            def _kill_single(p=p_id):
+                try:
+                    res = self.container.exec_run(f"kill -{signal} {p}")
+                    return res.exit_code == 0
+                except Exception as e:
+                    logger.warning("kill_process_failed", session_id=self.session_id, pid=p, error=str(e))
+                    return False
+            ok = await loop.run_in_executor(None, _kill_single)
+            if p_id == pid:
+                success = ok
+        return success
+
+    async def _execute_cmd_interactive(self, action: CmdRunAction) -> dict:
+        """
+        Execute a shell command with bidirectional interactive streaming.
+
+        Instead of blocking on pexpect.expect(), this method:
+        1. Runs the command via shell.sendline()
+        2. Polls for output in a background thread, pushing chunks to an asyncio.Queue
+        3. An async loop reads those chunks, broadcasts them to the frontend via
+           WEBSOCKET_BROADCASTERS, and accumulates the full output
+        4. Simultaneously drains the interactive input queue (user keystrokes from
+           the frontend) and forwards them to the pexpect shell
+        5. Exits when [PROMPT_END]# is detected or timeout is reached
+        """
+        from agent.observability import WEBSOCKET_BROADCASTERS
+
+        loop = asyncio.get_event_loop()
+        ansi_escape = re_mod.compile(r'(?:\x1B[@-Z\\-_]|\x1B\[[0-?]*[ -/]*[@-~])')
+
+        # ── Async broadcast helper ──────────────────────────────────────
+        async def _broadcast(payload: dict):
+            callbacks = WEBSOCKET_BROADCASTERS.get(self.session_id, [])
+            for cb in callbacks:
+                try:
+                    await cb(payload)
+                except Exception:
+                    pass
+
+        self.should_restart_current = False
+
+        while True:
+            self.current_command = action.command
+            self.current_command_start = time.time()
+            self.current_command_pid = None
+
+            output_queue: asyncio.Queue = asyncio.Queue()
+            prompt_marker = '[PROMPT_END]# '
+
+            # ── Drain stale output from previous command ────────────────────
+            def _drain_stale():
+                try:
+                    while True:
+                        self.shell.read_nonblocking(size=4096, timeout=0.1)
+                except (pexpect.TIMEOUT, pexpect.EOF):
+                    pass
+
+            await loop.run_in_executor(None, _drain_stale)
+
+            # ── Drain any stale interactive input from a previous command ───
+            input_q = get_interactive_queue(self.session_id)
+            while not input_q.empty():
+                try:
+                    input_q.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+
+            # ── Send the command ────────────────────────────────────────────
+            def _send_command():
+                self.shell.sendline(action.command)
+
+            await loop.run_in_executor(None, _send_command)
+
+            # ── Create log files in sandbox ─────────────────────────────────
+            def _ensure_logs_dir():
+                try:
+                    self.container.exec_run('mkdir -p /workspace/logs', workdir='/workspace')
+                except Exception:
+                    pass
+            await loop.run_in_executor(None, _ensure_logs_dir)
+
+            # ── Broadcast command start to Agent Terminal ───────────────────
+            ts = time.strftime('%H:%M:%S')
+            await _broadcast({
+                'type': 'agent_log',
+                'data': f'\x1b[90m[{ts}]\x1b[0m \x1b[33m▶ Running:\x1b[0m {action.command}\r\n',
+                'session_id': self.session_id,
+            })
+            await _broadcast({
+                'type': 'process_start',
+                'command': action.command,
+                'session_id': self.session_id,
+            })
+
+            # ── Background thread: poll pexpect for output ──────────────────
+            finished_event = asyncio.Event()
+            accumulated_output: list[str] = []
+
+            # Wait a moment for process to spawn, then detect its PID
+            await asyncio.sleep(0.5)
+            processes = await self.get_active_processes()
+            fg_proc = self.get_foreground_process(processes)
+            if fg_proc:
+                self.current_command_pid = fg_proc["pid"]
+                await _broadcast({
+                    'type': 'foreground_pid',
+                    'pid': fg_proc["pid"],
+                    'session_id': self.session_id,
+                })
+
+            def _poll_output():
+                """Runs in a thread — reads pexpect output and pushes to queue."""
+                deadline = time.time() + settings.SANDBOX_TIMEOUT
+                idle_start = None
+                IDLE_THRESHOLD = 3.0  # seconds of no output → might be waiting
+                buffer = ""
+
+                while time.time() < deadline:
+                    if getattr(self, 'should_restart_current', False):
+                        loop.call_soon_threadsafe(output_queue.put_nowait, ('restart_requested', ''))
+                        return
+                    try:
+                        chunk = self.shell.read_nonblocking(size=4096, timeout=0.5)
+                        if isinstance(chunk, bytes):
+                            chunk = chunk.decode('utf-8', errors='ignore')
+                        if chunk:
+                            idle_start = None  # Reset idle timer
+                            loop.call_soon_threadsafe(output_queue.put_nowait, ('data', chunk))
+                            # Check for prompt end in rolling buffer
+                            buffer = (buffer + chunk)[-1000:]
+                            if prompt_marker in buffer:
+                                loop.call_soon_threadsafe(output_queue.put_nowait, ('done', ''))
+                                return
+                    except pexpect.TIMEOUT:
+                        # No output for 0.5s — check if idle
+                        if idle_start is None:
+                            idle_start = time.time()
+                        elif time.time() - idle_start >= IDLE_THRESHOLD:
+                            # Stalled for 3s — notify main loop to check if we are waiting for user input
+                            loop.call_soon_threadsafe(
+                                output_queue.put_nowait,
+                                ('waiting', '')
+                            )
+                            idle_start = None  # Reset so we don't spam
+                        continue
+                    except pexpect.EOF:
+                        loop.call_soon_threadsafe(output_queue.put_nowait, ('eof', ''))
+                        return
+
+                # Timeout reached
+                try:
+                    self.shell.sendcontrol('c')
+                    time.sleep(0.3)
+                    try:
+                        self.shell.read_nonblocking(size=4096, timeout=1)
+                    except (pexpect.TIMEOUT, pexpect.EOF):
+                        pass
+                except Exception:
+                    pass
+                loop.call_soon_threadsafe(output_queue.put_nowait, ('timeout', ''))
+
+            poll_future = loop.run_in_executor(None, _poll_output)
+
+            # ── Main async loop: read output + relay user input ─────────────
+            command_done = False
+            timed_out = False
+            first_line_skipped = False
+            consecutive_waits = 0          # idle ticks with no auto-answer
+            last_prompt_broadcast = ''     # dedup repeated interactive_waiting
+            last_auto_answer = ''          # loop guard: same auto-answer repeating
+            same_auto_streak = 0           # → escalate to the user instead
+            restart_triggered = False
+
+            while not command_done:
+                # 1) Check for user input (non-blocking)
+                try:
+                    user_data = input_q.get_nowait()
+                    if user_data:
+                        # Enter must reach the pty as '\r' (what real terminals
+                        # send): raw-mode TUIs ignore '\n', while canonical-mode
+                        # programs translate '\r' to '\n' via ICRNL. So '\r'
+                        # works everywhere — normalize all newlines to it.
+                        user_data = user_data.replace('\r\n', '\r').replace('\n', '\r')
+
+                        def _send_input(data=user_data):
+                            self.shell.send(data)
+                        await loop.run_in_executor(None, _send_input)
+
+                        # Confirm delivery in the Agent Terminal + reset waiting state
+                        shown = user_data.strip() or '⏎'
+                        await _broadcast({
+                            'type': 'agent_log',
+                            'data': f'\x1b[32m⌨ Your answer was sent to the command:\x1b[0m {shown}\r\n',
+                            'session_id': self.session_id,
+                        })
+                        last_prompt_broadcast = ''
+                        consecutive_waits = 0
+                except asyncio.QueueEmpty:
+                    pass
+
+                # 2) Read output chunks (with short timeout to keep input responsive)
+                try:
+                    msg_type, chunk = await asyncio.wait_for(
+                        output_queue.get(), timeout=0.2
+                    )
+                except asyncio.TimeoutError:
+                    continue
+
+                if msg_type == 'restart_requested':
+                    command_done = True
+                    restart_triggered = True
+
+                elif msg_type == 'data':
+                    consecutive_waits = 0  # output resumed — not stalled
+                    # Clean ANSI codes for storage, but send raw for terminal display
+                    clean_chunk = ansi_escape.sub('', chunk)
+
+                    # Skip the echo of the command itself (first line)
+                    if not first_line_skipped:
+                        lines = clean_chunk.split('\n', 1)
+                        if action.command.strip() in lines[0]:
+                            clean_chunk = lines[1] if len(lines) > 1 else ''
+                        first_line_skipped = True
+
+                    # Remove prompt marker from display
+                    display_chunk = chunk.replace(prompt_marker, '')
+
+                    if display_chunk:
+                        if clean_chunk:
+                            accumulated_output.append(clean_chunk)
+                        # Broadcast raw terminal output to frontend
+                        await _broadcast({
+                            'type': 'interactive_output',
+                            'data': display_chunk,
+                            'session_id': self.session_id,
+                        })
+
+                elif msg_type == 'waiting':
+                    # Command appears stalled — check if we can auto-answer
+                    recent = ''.join(accumulated_output[-3:]) if accumulated_output else ''
+                    recent_stripped = recent.strip()
+
+                    if not recent_stripped:
+                        continue
+
+                    # ── Auto-responder: detect common CLI prompts and answer them ──
+                    auto_answer = _detect_cli_prompt(recent_stripped)
+
+                    # Loop guard: if the SAME auto-answer fires repeatedly the
+                    # prompt isn't accepting it — stop guessing, ask the user.
+                    if auto_answer is not None:
+                        if auto_answer == last_auto_answer:
+                            same_auto_streak += 1
+                        else:
+                            last_auto_answer = auto_answer
+                            same_auto_streak = 1
+                        if same_auto_streak > 2:
+                            logger.warning(
+                                "auto_answer_loop_detected",
+                                session_id=self.session_id,
+                                answer=repr(auto_answer),
+                                streak=same_auto_streak,
+                            )
+                            auto_answer = None  # escalate to the user below
+
+                    if auto_answer is not None:
+                        consecutive_waits = 0
+                        # Human-readable form: arrow escapes → ↓/↑, newline → ⏎
+                        answer_display = (
+                            auto_answer.replace('\x1b[B', '↓').replace('\x1b[A', '↑')
+                            .replace('\r', '⏎').replace('\n', '⏎')
+                        )
+                        logger.info(
+                            "interactive_auto_answer",
+                            session_id=self.session_id,
+                            prompt=recent_stripped[-100:],
+                            answer=answer_display,
+                        )
+                        # Broadcast to frontend so user sees what happened
+                        await _broadcast({
+                            'type': 'interactive_output',
+                            'data': f'\x1b[33m[auto-answer: {answer_display}]\x1b[0m\r\n',
+                            'session_id': self.session_id,
+                        })
+                        # Send the answer to pexpect
+                        def _send_auto(ans=auto_answer):
+                            self.shell.send(ans)
+                        await loop.run_in_executor(None, _send_auto)
+                    else:
+                        consecutive_waits += 1
+                        # Parse selection-menu options so the frontend can render
+                        # them as clickable choices instead of a free-text box.
+                        menu_options = _parse_menu_options(recent_stripped[-600:])
+                        # The question is the last non-empty line of output —
+                        # except for selection menus, where the user needs to
+                        # see ALL the options to answer.
+                        if menu_options:
+                            menu_lines = [ln.rstrip() for ln in recent_stripped.splitlines() if ln.strip()]
+                            question = '\n'.join(menu_lines[-8:])
+                        else:
+                            question = next(
+                                (ln.strip() for ln in reversed(recent_stripped.splitlines()) if ln.strip()),
+                                '',
+                            )
+                        looks_like_prompt = (
+                            recent[-1] in (' ', '?', ':', '>', '$', '#', '-', ']')
+                            or '?' in question
+                            # Selection menus the auto-responder declined to answer
+                            or any(m in recent_stripped[-600:] for m in ('●', '○', '◯', '❯'))
+                        )
+                        # Unknown prompt-shaped stall → ask immediately.
+                        # Any other stall → ask after ~3 idle ticks (could just be slow).
+                        if (looks_like_prompt or consecutive_waits >= 3) and question != last_prompt_broadcast:
+                            last_prompt_broadcast = question
+                            await _broadcast({
+                                'type': 'interactive_waiting',
+                                'prompt': question[:600],
+                                'context': recent_stripped[-400:],
+                                'certain': looks_like_prompt,
+                                'command': action.command[:200],
+                                'input_type': 'select' if len(menu_options) >= 2 else 'text',
+                                'options': menu_options[:10],
+                                'session_id': self.session_id,
+                            })
+
+                elif msg_type == 'done':
+                    command_done = True
+
+                elif msg_type == 'timeout':
+                    command_done = True
+                    timed_out = True
+
+                elif msg_type == 'eof':
+                    command_done = True
+
+            # ── Wait for poll thread to finish ──────────────────────────────
+            await poll_future
+
+            if restart_triggered:
+                if self.current_command_pid:
+                    await self.kill_process(self.current_command_pid, signal=9)
+                await _broadcast({
+                    'type': 'agent_log',
+                    'data': f'\x1b[33m↻ Restarting command:\x1b[0m {action.command}\r\n',
+                    'session_id': self.session_id,
+                })
+                self.should_restart_current = False
+                await asyncio.sleep(1)
+                continue
+
+            break
+
+        # ── Wait for poll thread to finish ──────────────────────────────
+        await poll_future
+
+        # ── Notify frontend that interactive mode is over ───────────────
+        await _broadcast({
+            'type': 'interactive_done',
+            'session_id': self.session_id,
+        })
+        await _broadcast({
+            'type': 'process_end',
+            'session_id': self.session_id,
+        })
+
+        if timed_out:
+            return {
+                'output': f'Command timed out after {settings.SANDBOX_TIMEOUT}s (SIGINT sent).',
+                'exit_code': 124,
+            }
+
+        # ── Get exit code ───────────────────────────────────────────────
+        def _get_exit_code():
+            try:
+                self.shell.sendline('echo $?')
+                self.shell.expect('\\[PROMPT_END\\]# ', timeout=5)
+                raw = self.shell.before or ''
+                if isinstance(raw, bytes):
+                    raw = raw.decode('utf-8', errors='ignore')
+                cleaned = ansi_escape.sub('', raw)
+                code_str = cleaned.strip().split('\n')[-1].strip()
+                return int(code_str)
+            except (pexpect.TIMEOUT, pexpect.EOF, ValueError) as e:
+                # Don't fail silently — the reported exit code is a GUESS here
+                logger.warning(
+                    "exit_code_retrieval_failed",
+                    session_id=self.session_id,
+                    error=type(e).__name__,
+                    assumed_exit_code=1,
+                )
+                return 1
+
+        exit_code = await loop.run_in_executor(None, _get_exit_code)
+
+        full_output = ''.join(accumulated_output)
+        # Remove any trailing prompt marker remnants
+        full_output = full_output.replace(prompt_marker, '').strip()
+        cleaned_output = ansi_escape.sub('', full_output).strip()
+
+        # ── Broadcast command completion summary to Agent Terminal ───────
+        ts = time.strftime('%H:%M:%S')
+        if exit_code == 0:
+            await _broadcast({
+                'type': 'agent_log',
+                'data': f'\x1b[90m[{ts}]\x1b[0m \x1b[32m✓ Command succeeded\x1b[0m (exit 0)\r\n',
+                'session_id': self.session_id,
+            })
+        else:
+            # Short error summary for Agent Terminal
+            error_lines = cleaned_output.strip().split('\n')
+            short_error = error_lines[-1][:120] if error_lines else 'Unknown error'
+            await _broadcast({
+                'type': 'agent_log',
+                'data': f'\x1b[90m[{ts}]\x1b[0m \x1b[31m✗ Command failed\x1b[0m (exit {exit_code}): {short_error}\r\n'
+                        f'\x1b[90m  → Full stack trace in App Logs tab\x1b[0m\r\n',
+                'session_id': self.session_id,
+            })
+
+        # ── Write to log files inside sandbox ───────────────────────────
+        def _write_logs():
+            try:
+                import datetime
+                ts_full = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                log_entry = f"[{ts_full}] CMD: {action.command}\n{'='*60}\n{cleaned_output}\n{'='*60}\n\n"
+                # Append to app.log
+                self.container.exec_run(
+                    ['sh', '-c', f'echo {repr(log_entry)} >> /workspace/logs/app.log'],
+                    workdir='/workspace'
+                )
+                # If error, also append to error.log
+                if exit_code != 0:
+                    self.container.exec_run(
+                        ['sh', '-c', f'echo {repr(log_entry)} >> /workspace/logs/error.log'],
+                        workdir='/workspace'
+                    )
+                # Agent log entry (concise)
+                agent_entry = f"[{ts_full}] {'OK' if exit_code == 0 else 'FAIL'} ({exit_code}): {action.command}\n"
+                self.container.exec_run(
+                    ['sh', '-c', f'echo {repr(agent_entry)} >> /workspace/logs/agent.log'],
+                    workdir='/workspace'
+                )
+            except Exception:
+                pass
+        await loop.run_in_executor(None, _write_logs)
+
+        return {'output': cleaned_output, 'exit_code': exit_code}
 
     # ── Health check (from OpenHands) ───────────────────────────────────
 
@@ -416,7 +1208,8 @@ class DockerRuntime:
     def get_resource_usage(self) -> dict:
         """Return container CPU and memory usage."""
         try:
-            stats = self.container.stats(stream=False)
+            stats_data = self.container.stats(stream=False)
+            stats = cast(dict, stats_data)
             cpu_total = stats.get("cpu_stats", {}).get("cpu_usage", {}).get("total_usage", 0)
             cpu_prev = stats.get("precpu_stats", {}).get("cpu_usage", {}).get("total_usage", 0)
             sys_total = stats.get("cpu_stats", {}).get("system_cpu_usage", 0)
@@ -472,7 +1265,7 @@ class DockerRuntime:
         return sorted(path for path in output.splitlines() if path.strip())
 
     def read_file(self, path: str) -> str:
-        """Read one UTF-8 text file from the sandbox workspace."""
+        """Read one UTF-8 text file from the sandbox workspace. Returns a placeholder for binary files."""
         safe_path = path.strip().lstrip("/")
         if not safe_path or ".." in safe_path.split("/"):
             raise ValueError("Invalid workspace path")
@@ -483,7 +1276,30 @@ class DockerRuntime:
         extracted = tf.extractfile(member)
         if extracted is None:
             raise ValueError(f"{safe_path} is not a file")
-        return extracted.read().decode("utf-8")
+        
+        raw_bytes = extracted.read()
+        try:
+            return raw_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            return f"[Binary file: {len(raw_bytes)} bytes. Cannot be displayed in text editor.]"
+
+    def write_file(self, path: str, content: str) -> None:
+        """Write one UTF-8 text file to the sandbox workspace."""
+        safe_path = path.strip().lstrip("/")
+        if not safe_path or ".." in safe_path.split("/"):
+            raise ValueError("Invalid workspace path")
+
+        # Create tar file in memory
+        tar_stream = io.BytesIO()
+        with tarfile.open(fileobj=tar_stream, mode='w') as tar:
+            content_bytes = content.encode("utf-8")
+            tarinfo = tarfile.TarInfo(name=safe_path)
+            tarinfo.size = len(content_bytes)
+            tar.addfile(tarinfo, io.BytesIO(content_bytes))
+        
+        tar_stream.seek(0)
+        self.container.put_archive("/workspace", tar_stream.read())
+
 
     def download_workspace_zip(self) -> bytes:
         """Download the workspace as a zip archive."""
@@ -543,58 +1359,232 @@ class DockerRuntime:
     # ── Action execution ────────────────────────────────────────────────
 
     async def execute(self, action: ActionType) -> dict:
-        if isinstance(action, CmdRunAction):
-            loop = asyncio.get_event_loop()
+        import time
+        from agent.observability import ObservabilityManager
+        start_time = time.time()
+        
+        # Capture file content before modification
+        prev_content = ""
+        if isinstance(action, (FileWriteAction, FileReplaceAction)):
+            try:
+                prev_content = self.read_file(action.path)
+                # Save a version snapshot before the AI overwrites this file
+                from agent.file_history import FileHistoryManager
+                history = FileHistoryManager()
+                await history.save_snapshot(self, action.path, prev_content)
+            except Exception:
+                pass  # New file or history save failed — not critical
 
-            def run_sync():
-                try:
-                    while True:
-                        try:
-                            self.shell.read_nonblocking(size=1024, timeout=0.1)
-                        except (pexpect.TIMEOUT, pexpect.EOF):
-                            break
-
-                    self.shell.sendline(action.command)
-                    self.shell.expect(
-                        '\\[PROMPT_END\\]# ',
-                        timeout=settings.SANDBOX_TIMEOUT,
-                    )
-
-                    raw_output = self.shell.before
-                    lines = raw_output.split('\n')
-                    if len(lines) > 0 and action.command.strip() in lines[0]:
-                        output = '\n'.join(lines[1:]).strip()
-                    else:
-                        output = raw_output.strip()
-
-                    self.shell.sendline('echo $?')
-                    self.shell.expect('\\[PROMPT_END\\]# ', timeout=5)
-                    
-                    ansi_escape = re_mod.compile(r'(?:\x1B[@-Z\\-_]|\x1B\[[0-?]*[ -/]*[@-~])')
-                    cleaned_before = ansi_escape.sub('', self.shell.before)
-                    exit_code_str = cleaned_before.strip().split('\n')[-1].strip()
-                    try:
-                        exit_code = int(exit_code_str)
-                    except ValueError:
-                        exit_code = 1
-
-                    cleaned_output = ansi_escape.sub('', output).strip()
-                    return {'output': cleaned_output, 'exit_code': exit_code}
-
-                except pexpect.TIMEOUT:
-                    self.shell.sendcontrol('c')
-                    try:
-                        self.shell.expect('\\[PROMPT_END\\]# ', timeout=5)
-                    except pexpect.TIMEOUT:
-                        pass
-                    return {
-                        'output': f'Command timed out after {settings.SANDBOX_TIMEOUT}s (SIGINT sent).',
-                        'exit_code': 124,
+        # Execute inner action logic
+        result = await self._execute_inner(action)
+        
+        # Calculate duration
+        duration = round(time.time() - start_time, 2)
+        exit_code = result.get('exit_code', 0)
+        output = result.get('output', '')
+        
+        # Log event based on type
+        try:
+            if isinstance(action, FileReadAction):
+                content = result.get('content', '')
+                ObservabilityManager().log(
+                    session_id=self.session_id,
+                    agent_name="Coder Agent",
+                    event_type="file_read",
+                    description=f"Read file: {action.path}",
+                    status="success" if exit_code == 0 else "failed",
+                    duration=duration,
+                    metadata={
+                        "file_path": action.path,
+                        "file_size": len(content),
+                        "reason": "Inspecting file structure and contents before editing"
                     }
-                except Exception as e:
-                    return {'output': f'Error: {str(e)}', 'exit_code': 1}
+                )
+            elif isinstance(action, FileWriteAction):
+                import difflib
+                if prev_content:
+                    old_lines = prev_content.splitlines(keepends=True)
+                    new_lines = action.content.splitlines(keepends=True)
+                    diff = difflib.unified_diff(
+                        old_lines,
+                        new_lines,
+                        fromfile=f"a/{action.path}",
+                        tofile=f"b/{action.path}"
+                    )
+                    diff_str = "".join(diff)
+                    
+                    ObservabilityManager().log(
+                        session_id=self.session_id,
+                        agent_name="Coder Agent",
+                        event_type="file_modify",
+                        description=f"Modified file: {action.path}",
+                        status="success",
+                        duration=duration,
+                        metadata={
+                            "file_path": action.path,
+                            "prev_content": prev_content,
+                            "new_content": action.content,
+                            "diff": diff_str
+                        }
+                    )
+                else:
+                    ObservabilityManager().log(
+                        session_id=self.session_id,
+                        agent_name="Coder Agent",
+                        event_type="file_create",
+                        description=f"Created file: {action.path}",
+                        status="success",
+                        duration=duration,
+                        metadata={
+                            "file_path": action.path,
+                            "content_preview": action.content[:400]
+                        }
+                    )
+            elif isinstance(action, FileReplaceAction):
+                import difflib
+                old_lines = action.target_content.splitlines(keepends=True)
+                new_lines = action.replacement_content.splitlines(keepends=True)
+                diff = difflib.unified_diff(
+                    old_lines,
+                    new_lines,
+                    fromfile=f"a/{action.path}",
+                    tofile=f"b/{action.path}"
+                )
+                diff_str = "".join(diff)
+                
+                ObservabilityManager().log(
+                    session_id=self.session_id,
+                    agent_name="Coder Agent",
+                    event_type="file_modify",
+                    description=f"Patched file: {action.path}",
+                    status="success" if exit_code == 0 else "failed",
+                    duration=duration,
+                    metadata={
+                        "file_path": action.path,
+                        "diff": diff_str
+                    }
+                )
+            elif isinstance(action, BrowserAction):
+                ObservabilityManager().log(
+                    session_id=self.session_id,
+                    agent_name="Coder Agent",
+                    event_type="tool_execution",
+                    description=f"Browser action: {action.command} {action.target}",
+                    status="success" if exit_code == 0 else "failed",
+                    duration=duration,
+                    metadata={
+                        "tool_name": "browser",
+                        "parameters": {"command": action.command, "target": action.target},
+                        "input": action.target,
+                        "output": output
+                    }
+                )
+            elif isinstance(action, CmdRunAction) and not getattr(action, 'is_hidden', False):
+                cmd_lower = action.command.lower()
+                is_dependency = any(k in cmd_lower for k in ["npm install", "pip install", "yarn add", "pnpm add", "apt-get install"])
+                is_test = any(k in cmd_lower for k in ["npm test", "pytest", "npm run test", "vitest"])
+                is_build = any(k in cmd_lower for k in ["npm run build", "vite build", "tsc", "python -m compileall"])
+                
+                if is_dependency:
+                    pkg_name = "unknown"
+                    words = action.command.split()
+                    for i, word in enumerate(words):
+                        if word in ("install", "add") and i + 1 < len(words):
+                            pkg_name = words[i+1]
+                            break
+                    ObservabilityManager().log(
+                        session_id=self.session_id,
+                        agent_name="Coder Agent",
+                        event_type="dependency",
+                        description=f"Dependency action: {action.command}",
+                        status="success" if exit_code == 0 else "failed",
+                        duration=duration,
+                        metadata={
+                            "package_name": pkg_name,
+                            "action": "installed" if "install" in cmd_lower or "add" in cmd_lower else "removed",
+                            "version": "latest",
+                            "full_command": action.command
+                        }
+                    )
+                elif is_test:
+                    passed = 0
+                    failed = 0
+                    tests_run = 0
+                    if "passed" in output or "failed" in output:
+                        import re
+                        p_match = re.search(r'(\d+)\s+passed', output)
+                        f_match = re.search(r'(\d+)\s+failed', output)
+                        passed = int(p_match.group(1)) if p_match else 0
+                        failed = int(f_match.group(1)) if f_match else 0
+                        tests_run = passed + failed
+                    ObservabilityManager().log(
+                        session_id=self.session_id,
+                        agent_name="Validator Agent",
+                        event_type="testing",
+                        description=f"Executed tests: {action.command}",
+                        status="success" if exit_code == 0 else "failed",
+                        duration=duration,
+                        metadata={
+                            "tests_run": tests_run or (1 if exit_code == 0 else 0),
+                            "passed": passed or (1 if exit_code == 0 else 0),
+                            "failed": failed or (1 if exit_code != 0 else 0),
+                            "coverage": 100 if exit_code == 0 else 0,
+                            "failure_details": output if exit_code != 0 else ""
+                        }
+                    )
+                elif is_build:
+                    ObservabilityManager().log(
+                        session_id=self.session_id,
+                        agent_name="Coder Agent",
+                        event_type="build",
+                        description=f"Compilation/build: {action.command}",
+                        status="success" if exit_code == 0 else "failed",
+                        duration=duration,
+                        metadata={
+                            "stage": "Compilation / Bundling",
+                            "output": output,
+                            "exit_code": exit_code
+                        }
+                    )
+                else:
+                    ObservabilityManager().log(
+                        session_id=self.session_id,
+                        agent_name="Coder Agent",
+                        event_type="terminal",
+                        description=f"Terminal command: {action.command}",
+                        status="success" if exit_code == 0 else "failed",
+                        duration=duration,
+                        metadata={
+                            "command": action.command,
+                            "output": output,
+                            "exit_code": exit_code
+                        }
+                    )
+                
+                if exit_code != 0:
+                    ObservabilityManager().log(
+                        session_id=self.session_id,
+                        agent_name="Coder Agent",
+                        event_type="error",
+                        description="Terminal command failed",
+                        status="failed",
+                        duration=duration,
+                        metadata={
+                            "error_type": "CommandExecutionError",
+                            "file_name": "Terminal",
+                            "line_number": 1,
+                            "stack_trace": output,
+                            "error_message": f"Command '{action.command}' failed with exit code {exit_code}"
+                        }
+                    )
+        except Exception as exc:
+            logger.warning("obs_log_execution_failed", error=str(exc))
 
-            return await loop.run_in_executor(None, run_sync)
+        return result
+
+    async def _execute_inner(self, action: ActionType) -> dict:
+        if isinstance(action, CmdRunAction):
+            return await self._execute_cmd_interactive(action)
 
         elif isinstance(action, BrowserAction):
             browser = await PlaywrightManager.get_instance()
@@ -631,6 +1621,26 @@ class DockerRuntime:
             self.container.put_archive('/workspace', buf)
             return {'status': 'written', 'path': action.path, 'exit_code': 0, 'output': f"Created {action.path}"}
 
+        elif isinstance(action, FileReplaceAction):
+            try:
+                content = self.read_file(action.path)
+                if action.target_content in content:
+                    new_content = content.replace(action.target_content, action.replacement_content)
+                    
+                    buf = io.BytesIO()
+                    with tarfile.open(fileobj=buf, mode='w') as tar:
+                        data = new_content.encode('utf-8')
+                        info = tarfile.TarInfo(name=action.path)
+                        info.size = len(data)
+                        tar.addfile(info, io.BytesIO(data))
+                    buf.seek(0)
+                    self.container.put_archive('/workspace', buf)
+                    return {'status': 'replaced', 'path': action.path, 'exit_code': 0, 'output': f"Patched {action.path}"}
+                else:
+                    return {'error': 'Target content not found in file', 'exit_code': 1, 'output': f"Target block not found in {action.path}"}
+            except Exception as e:
+                return {'error': str(e), 'exit_code': 1, 'output': f"Failed to patch {action.path}: {str(e)}"}
+
         elif isinstance(action, FileReadAction):
             try:
                 content = self.read_file(action.path)
@@ -657,6 +1667,7 @@ class DockerRuntime:
             logger.error("container_cleanup_error", session_id=self.session_id, error=str(e))
 
         self._local_cache.pop(self.session_id, None)
+        cleanup_interactive_queue(self.session_id)
         try:
             r = _get_redis()
             r.delete(f"{self.REDIS_KEY_PREFIX}{self.session_id}")

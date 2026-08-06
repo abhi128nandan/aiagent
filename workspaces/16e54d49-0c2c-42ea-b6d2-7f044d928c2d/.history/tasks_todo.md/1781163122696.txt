@@ -1,0 +1,40 @@
+# Project: calculator
+
+## Description
+A simple calculator application built with React using Vite
+
+## Tasks Checklist
+
+- [ ] **MODIFY** `src/App.jsx`
+  *Description:* Replace the default Vite React boilerplate with the calculator layout: add a Calculator component import, display screen, number buttons, operator buttons, and equals button. Set up React state for calculator display using useState. Implement logic to handle button clicks and update the display screen accordingly.
+
+- [x] **CREATE** `src/components/Calculator.jsx`
+  *Description:* Create a Calculator component with a display screen, number buttons, operator buttons, and equals button. Implement logic for handling button clicks, performing calculations, and updating the display screen. Use React state to store the current calculation and result.
+
+- [x] **CREATE** `src/components/DisplayScreen.jsx`
+  *Description:* Create a DisplayScreen component to display the current calculation and result. Use React state to update the display screen when the user interacts with the calculator. Implement logic to handle calculation updates and display the result.
+
+- [x] **CREATE** `src/components/NumberButton.jsx`
+  *Description:* Create a NumberButton component to handle number button clicks. Implement logic to append the clicked number to the current calculation and update the display screen. Use React state to store the current calculation.
+
+- [x] **CREATE** `src/components/OperatorButton.jsx`
+  *Description:* Create an OperatorButton component to handle operator button clicks. Implement logic to perform the selected operation and update the display screen. Use React state to store the current calculation and result.
+
+- [x] **CREATE** `src/components/EqualsButton.jsx`
+  *Description:* Create an EqualsButton component to handle equals button clicks. Implement logic to calculate the result of the current calculation and update the display screen. Use React state to store the result.
+
+- [ ] **MODIFY** `src/index.css`
+  *Description:* Replace default Vite styles with calculator-specific CSS: layout, button styles, display screen styles, and font styles. Implement responsive design to ensure the calculator layout adapts to different screen sizes.
+
+- [ ] **MODIFY** `src/main.jsx`
+  *Description:* Update the main.jsx file to render the Calculator component. Implement logic to handle calculator initialization and rendering.
+
+- [x] **MODIFY** `package.json`
+  *Description:* Update the package.json file to include any additional dependencies required for the calculator application. Install dependencies using npm install.
+
+- [ ] **CREATE** `vite.config.js`
+  *Description:* Create a vite.config.js file to configure Vite. Implement logic to configure the development server and build settings.
+
+- [ ] **RUN** `npm install`
+  *Description:* Install dependencies required for the calculator application using npm install.
+

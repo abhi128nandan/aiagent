@@ -108,6 +108,11 @@ class SandboxService:
         runtime = await self.get_runtime(session_id)
         return runtime.read_file(path)
 
+    async def write_file(self, session_id: str, path: str, content: str) -> None:
+        runtime = await self.get_runtime(session_id)
+        runtime.write_file(path, content)
+
+
     async def download_workspace(self, session_id: str) -> bytes:
         runtime = await self.get_runtime(session_id)
         return runtime.download_workspace_zip()

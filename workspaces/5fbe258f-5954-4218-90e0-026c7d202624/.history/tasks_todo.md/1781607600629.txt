@@ -1,0 +1,145 @@
+# Project: To-Do Web Application
+
+## Description
+A web application for creating, organizing, tracking, and completing tasks.
+
+## Tasks Checklist
+
+- [ ] **MODIFY** `package.json`
+  *Description:* Add `react-router-dom` and `axios` to frontend dependencies. `react-router-dom` is for client-side routing, and `axios` for making HTTP requests to the backend API.
+
+- [ ] **MODIFY** `vite.config.ts`
+  *Description:* Configure Vite development server to run on port 3000 and listen on all network interfaces (0.0.0.0) to align with the project's `run_command` and allow external access in a containerized environment.
+
+- [ ] **MODIFY** `src/index.css`
+  *Description:* Replace the default Vite/React global styles with a custom CSS reset, define CSS variables for colors and fonts, and establish basic typography and layout styles for the entire application. This includes setting `box-sizing`, `font-family`, and `body` margins.
+
+- [ ] **MODIFY** `src/App.css`
+  *Description:* Clear existing boilerplate styles and add base styles for the main application layout, including flexbox for overall structure, responsive adjustments, and general container styling. This will define the visual foundation for the application's main content area.
+
+- [ ] **MODIFY** `src/App.tsx`
+  *Description:* Replace the default Vite/React boilerplate content with the main application structure. This involves setting up `react-router-dom` for navigation, defining routes for authentication (`/login`, `/register`), the dashboard (`/`), tasks (`/tasks`), and a 404 page. It will also integrate `AuthContext` and `TaskContext` providers to manage global state for authentication and task data, and render the `Layout` component which contains the `Navbar` and `Sidebar`.
+
+- [ ] **MODIFY** `src/main.tsx`
+  *Description:* Wrap the `App` component with `BrowserRouter` from `react-router-dom` to enable client-side routing throughout the application. This is essential for navigating between different pages without full page reloads.
+
+- [ ] **DELETE** `src/assets/hero.png`
+  *Description:* Remove the unused `hero.png` asset as it is part of the initial boilerplate and not relevant to the To-Do application.
+
+- [ ] **CREATE** `src/components/Layout.tsx`
+  *Description:* Create a `Layout` component that defines the overall visual structure of the application. It will include a `Navbar` at the top, a `Sidebar` for navigation and filters on the left, and a main content area where `Outlet` from `react-router-dom` will render the current page component. This component ensures a consistent UI across different routes.
+
+- [ ] **CREATE** `src/components/Navbar.tsx`
+  *Description:* Create a `Navbar` component for global navigation. It will display the application logo/title, provide navigation links (e.g., Dashboard, Tasks), and include user-related actions like login/logout, potentially showing the authenticated user's name. It should be responsive and visually distinct.
+
+- [ ] **CREATE** `src/components/Sidebar.tsx`
+  *Description:* Create a `Sidebar` component to display task lists, categories, or filtering options. For the MVP, it will primarily offer navigation links to different task views (e.g., 'All Tasks', 'Due Today', 'Upcoming', 'Completed') and potentially a 'Create New Task' button. It should be collapsible or responsive for smaller screens.
+
+- [ ] **CREATE** `src/pages/Dashboard.tsx`
+  *Description:* Create the `Dashboard` page component. This page will provide a summary view of tasks, displaying counts or lists of 'Due Today', 'Upcoming', 'Overdue', and 'Completed' tasks (FR-18). It will fetch task data from `TaskContext` and present it in an organized, at-a-glance format.
+
+- [ ] **CREATE** `src/pages/Tasks.tsx`
+  *Description:* Create the `Tasks` page component, which will serve as the main view for managing all tasks. It will include a `TaskForm` for creating new tasks, a `TaskList` component to display tasks, and potentially search/filter controls (FR-12). It will interact with `TaskContext` to fetch, add, update, and delete tasks.
+
+- [ ] **CREATE** `src/pages/Auth.tsx`
+  *Description:* Create the `Auth` page component, which will handle both user registration (FR-01) and login (FR-02). It will contain forms for email/password input, client-side validation, and logic to call authentication functions from `AuthContext`. It should also handle displaying error messages and redirecting upon successful authentication.
+
+- [ ] **CREATE** `src/pages/NotFound.tsx`
+  *Description:* Create a `NotFound` page component to display when a user navigates to an undefined route. It should provide a clear message (e.g., '404 - Page Not Found') and a link back to the dashboard or home page for better user experience.
+
+- [ ] **CREATE** `src/components/TaskForm.tsx`
+  *Description:* Create a `TaskForm` component for creating (FR-04) and editing (FR-05) tasks. It will include input fields for task title, description, due date, and priority (FR-09). It will manage its own local state for form inputs and submit data to `TaskContext` for API interaction. The form should include basic client-side validation.
+
+- [ ] **CREATE** `src/components/TaskList.tsx`
+  *Description:* Create a `TaskList` component responsible for rendering a collection of `TaskItem` components. It will receive an array of tasks as props and iterate over them. It should also handle conditional rendering (e.g., 'No tasks found') and potentially sorting (FR-13) or filtering based on props.
+
+- [ ] **CREATE** `src/components/TaskItem.tsx`
+  *Description:* Create a `TaskItem` component to display individual task details. Each item will show the task title, description, due date, and priority. It will include controls for marking a task as complete (FR-06), editing (FR-05), and deleting (FR-07) the task. These actions will trigger functions passed down from `TaskList` or `TaskContext`.
+
+- [ ] **CREATE** `src/components/Modal.tsx`
+  *Description:* Create a reusable `Modal` component. This component will be used for displaying confirmation dialogs (e.g., for task deletion), task editing forms, or other temporary overlays. It should accept `isOpen`, `onClose`, and `children` props, and include basic styling for centering and overlay background.
+
+- [ ] **CREATE** `src/components/Button.tsx`
+  *Description:* Create a reusable `Button` component. This component will standardize button styling and behavior across the application. It should accept props for `onClick`, `type`, `children`, and `className` for custom styling, ensuring accessibility and consistent design.
+
+- [ ] **CREATE** `src/components/Input.tsx`
+  *Description:* Create a reusable `Input` component for form fields. This component will standardize input styling and behavior. It should accept props like `type`, `value`, `onChange`, `placeholder`, `name`, and `label`, and include basic styling and error display capabilities.
+
+- [ ] **CREATE** `src/api/tasks.ts`
+  *Description:* Create an API service file for tasks. This file will contain functions for making HTTP requests to the backend's `/api/tasks` endpoint using `axios`. Functions will include `getAllTasks`, `getTaskById`, `createTask`, `updateTask`, and `deleteTask`. It will handle request/response parsing and error handling.
+
+- [ ] **CREATE** `src/api/auth.ts`
+  *Description:* Create an API service file for authentication. This file will contain functions for making HTTP requests to the backend's authentication endpoints (e.g., `/api/auth/register`, `/api/auth/login`). It will use `axios` to handle user registration (FR-01) and login (FR-02), storing tokens (if applicable) and managing session state.
+
+- [ ] **CREATE** `src/context/AuthContext.tsx`
+  *Description:* Create an `AuthContext` using React's Context API. This context will manage the global authentication state (e.g., `isAuthenticated`, `user`, `token`). It will provide functions for `login`, `register`, and `logout` that interact with the `auth.ts` API service and update the global state. It will also handle initial authentication check on app load.
+
+- [ ] **CREATE** `src/context/TaskContext.tsx`
+  *Description:* Create a `TaskContext` using React's Context API. This context will manage the global state of tasks in the application. It will provide functions to `fetchTasks`, `addTask`, `updateTask`, and `deleteTask`, interacting with the `tasks.ts` API service. Components throughout the app can consume this context to access and modify task data.
+
+- [ ] **CREATE** `src/hooks/useAuth.ts`
+  *Description:* Create a custom React hook `useAuth` to simplify consuming the `AuthContext`. This hook will provide easy access to the authentication state and functions (`login`, `logout`, `register`) from any functional component, reducing boilerplate and improving code readability.
+
+- [ ] **CREATE** `src/hooks/useTasks.ts`
+  *Description:* Create a custom React hook `useTasks` to simplify consuming the `TaskContext`. This hook will provide easy access to the task data and functions (`fetchTasks`, `addTask`, `updateTask`, `deleteTask`) from any functional component, centralizing task-related logic.
+
+- [ ] **CREATE** `src/utils/helpers.ts`
+  *Description:* Create a utility file `helpers.ts` to store common helper functions. This might include functions for date formatting, input validation, or other reusable logic that doesn't belong to a specific component or context. For MVP, it could include a function to format due dates.
+
+- [ ] **CREATE** `backend/package.json`
+  *Description:* Create the `package.json` file for the backend Express.js application. This file will define the project's metadata, scripts (`start`, `dev`), and dependencies (`express`, `pg`, `dotenv`, `cors`) and dev dependencies (`nodemon`).
+
+- [ ] **CREATE** `backend/.env`
+  *Description:* Create the `.env` file for backend environment variables. This file will store sensitive configuration like PostgreSQL database credentials (`DB_USER`, `DB_HOST`, `DB_NAME`, `DB_PASSWORD`, `DB_PORT`) and the backend server's `PORT` (e.g., 5000). These variables will be loaded using `dotenv`.
+
+- [ ] **CREATE** `backend/server.js`
+  *Description:* Create the main entry point for the backend server, `server.js`. This file will load environment variables using `dotenv`, import the Express `app` instance, and start the server on the configured `PORT`. It will log a message indicating the server is running.
+
+- [ ] **CREATE** `backend/src/app.js`
+  *Description:* Create the `app.js` file within `backend/src`. This file will configure the Express application, including middleware such as `cors` for cross-origin requests from the frontend and `express.json()` for parsing JSON request bodies. It will also define a basic root route and mount the `tasksRoutes` for handling task-related API requests.
+
+- [ ] **CREATE** `backend/src/config/db.js`
+  *Description:* Create the `db.js` file within `backend/src/config`. This file will set up the PostgreSQL database connection pool using the `pg` library and environment variables. It will export a `query` function for executing SQL queries and the `pool` instance itself, with error handling for connection issues.
+
+- [ ] **CREATE** `backend/src/models/taskModel.js`
+  *Description:* Create the `taskModel.js` file within `backend/src/models`. This file will encapsulate all database interactions for tasks. It will define an object `Task` with asynchronous methods for `findAll`, `findById`, `create`, `update`, and `delete` tasks, using parameterized queries to prevent SQL injection.
+
+- [ ] **CREATE** `backend/src/models/userModel.js`
+  *Description:* Create the `userModel.js` file within `backend/src/models`. This file will handle database operations related to users, including `findByEmail` for authentication and `create` for registration. It will interact with the PostgreSQL database to store and retrieve user information, including password hashes.
+
+- [ ] **CREATE** `backend/src/controllers/tasksController.js`
+  *Description:* Create the `tasksController.js` file within `backend/src/controllers`. This file will contain the business logic for handling task-related API requests. It will define asynchronous functions for `getAllTasks`, `getTaskById`, `createTask`, `updateTask`, and `deleteTask`, interacting with `taskModel` and handling request/response logic, including validation and error responses.
+
+- [ ] **CREATE** `backend/src/controllers/authController.js`
+  *Description:* Create the `authController.js` file within `backend/src/controllers`. This file will contain the business logic for user authentication and registration. It will define asynchronous functions for `register` (FR-01) and `login` (FR-02), interacting with `userModel`, hashing passwords, and potentially generating JWTs for session management. It will handle request validation and error responses.
+
+- [ ] **CREATE** `backend/src/routes/tasksRoutes.js`
+  *Description:* Create the `tasksRoutes.js` file within `backend/src/routes`. This file will define the API endpoints for task management. It will use `express.Router()` to map HTTP methods (GET, POST, PUT, DELETE) to the corresponding controller functions in `tasksController` for operations like fetching all tasks, getting a single task, creating, updating, and deleting tasks.
+
+- [ ] **CREATE** `backend/src/routes/authRoutes.js`
+  *Description:* Create the `authRoutes.js` file within `backend/src/routes`. This file will define the API endpoints for user authentication. It will use `express.Router()` to map HTTP methods (POST) to the corresponding controller functions in `authController` for user registration (`/register`) and login (`/login`).
+
+- [ ] **MODIFY** `backend/src/app.js`
+  *Description:* Modify `backend/src/app.js` to import and use the `authRoutes` for authentication endpoints, in addition to the existing `tasksRoutes`. This integrates the authentication API into the main Express application.
+
+- [ ] **MODIFY** `README.md`
+  *Description:* Update the `README.md` to reflect the new project structure and provide instructions for setting up and running both the frontend and backend applications. Include details on installing dependencies, configuring environment variables, setting up the PostgreSQL database, and starting the development servers for both parts of the monorepo.
+
+- [ ] **CREATE** `install_dependencies.sh`
+  *Description:* Create a shell script `install_dependencies.sh` at the project root to automate the installation of all frontend and backend dependencies. This script will navigate into both `frontend` and `backend` directories and run `npm install` in each, ensuring all required packages are set up.
+
+- [ ] **CREATE** `setup_database.sh`
+  *Description:* Create a shell script `setup_database.sh` at the project root to automate the PostgreSQL database setup. This script will contain commands to create the `todo_app_db` database and the `tasks` table, as well as a `users` table, using `psql`. It will prompt the user for necessary database credentials if not already configured in `.env`.
+
+- [ ] **CREATE** `run_dev_servers.sh`
+  *Description:* Create a shell script `run_dev_servers.sh` at the project root to start both the frontend and backend development servers concurrently. This script will navigate to `frontend` and run `npm run dev` in the background, then navigate to `backend` and run `npm run dev` in the foreground, or vice-versa, ensuring both parts of the application are running for development.
+
+- [ ] **RUN** `package.json`
+  *Description:* Install new frontend dependencies: `react-router-dom` and `axios`.
+
+- [ ] **RUN** `backend/package.json`
+  *Description:* Install backend dependencies: `express`, `pg`, `dotenv`, `cors` and dev dependency `nodemon`.
+
+- [ ] **RUN** `setup_database.sh`
+  *Description:* Execute the database setup script to create the PostgreSQL database and necessary tables. Ensure PostgreSQL is running and `your_db_user` has appropriate permissions.
+
