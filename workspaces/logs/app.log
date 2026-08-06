@@ -1,0 +1,136 @@
+[2026-06-24 14:51:39] CMD: echo '--- VERSIONS ---' && python3 --version 2>/dev/null && node --version 2>/dev/null && npm --version 2>/dev/null && java -version 2>/dev/null && go version 2>/dev/null; echo '--- END ---'
+============================================================
+--- VERSIONS ---
+Python 3.11.15
+v20.20.2
+10.8.2
+--- END ---
+============================================================
+
+
+[2026-06-24 14:51:47] CMD: npm install -g create-react-app 2>&1 | tail -3
+============================================================
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.17.0
+npm notice To update run: npm install -g npm@11.17.0
+npm notice
+============================================================
+
+
+[2026-06-24 14:52:03] CMD: npm install -g vite 2>&1 | tail -3
+============================================================
+8 packages are looking for funding
+  run `npm fund` for details
+============================================================
+
+
+[2026-06-24 14:52:04] CMD: echo 'node:' v20.20.2 '| npm:' 10.8.2 '| python:' Python 3.11.15 '| java:' sh: 1: java: not found '| go:' N/A
+============================================================
+node: v20.20.2 | npm: 10.8.2 | python: Python 3.11.15 | java: bash: java: command not found | go: N/A
+============================================================
+
+
+[2026-06-24 14:52:47] CMD: npm install
+============================================================
+⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧
+added 152 packages, and audited 153 packages in 43s
+⠧
+⠧42 packages are looking for funding
+⠧  run `npm fund` for details
+⠧
+found 0 vulnerabilities
+⠧
+============================================================
+
+
+[2026-06-24 14:53:55] CMD: echo '--- VERSIONS ---' && python3 --version 2>/dev/null && node --version 2>/dev/null && npm --version 2>/dev/null && java -version 2>/dev/null && go version 2>/dev/null; echo '--- END ---'
+============================================================
+--- VERSIONS ---
+Python 3.11.15
+v20.20.2
+10.8.2
+--- END ---
+============================================================
+
+
+[2026-06-24 14:53:56] CMD: echo 'node:' v20.20.2 '| npm:' 10.8.2 '| python:' Python 3.11.15 '| java:' sh: 1: java: not found '| go:' N/A
+============================================================
+node: v20.20.2 | npm: 10.8.2 | python: Python 3.11.15 | java: bash: java: command not found | go: N/A
+============================================================
+
+
+[2026-06-24 14:54:24] CMD: echo '--- VERSIONS ---' && python3 --version 2>/dev/null && node --version 2>/dev/null && npm --version 2>/dev/null && java -version 2>/dev/null && go version 2>/dev/null; echo '--- END ---'
+============================================================
+--- VERSIONS ---
+Python 3.11.15
+v20.20.2
+10.8.2
+--- END ---
+============================================================
+
+
+[2026-06-24 14:54:25] CMD: echo 'node:' v20.20.2 '| npm:' 10.8.2 '| python:' Python 3.11.15 '| java:' sh: 1: java: not found '| go:' N/A
+============================================================
+node: v20.20.2 | npm: 10.8.2 | python: Python 3.11.15 | java: bash: java: command not found | go: N/A
+============================================================
+
+
+[2026-06-24 14:55:00] CMD: echo '--- VERSIONS ---' && python3 --version 2>/dev/null && node --version 2>/dev/null && npm --version 2>/dev/null && java -version 2>/dev/null && go version 2>/dev/null; echo '--- END ---'
+============================================================
+--- VERSIONS ---
+Python 3.11.15
+v20.20.2
+10.8.2
+--- END ---
+============================================================
+
+
+[2026-06-24 14:55:00] CMD: echo 'node:' v20.20.2 '| npm:' 10.8.2 '| python:' Python 3.11.15 '| java:' sh: 1: java: not found '| go:' N/A
+============================================================
+node: v20.20.2 | npm: 10.8.2 | python: Python 3.11.15 | java: bash: java: command not found | go: N/A
+============================================================
+
+
+[2026-06-30 02:23:37] CMD: echo '--- VERSIONS ---' && python3 --version 2>/dev/null && node --version 2>/dev/null && npm --version 2>/dev/null && java -version 2>/dev/null && go version 2>/dev/null; echo '--- END ---'
+============================================================
+--- VERSIONS ---
+Python 3.11.15
+v20.20.2
+10.8.2
+--- END ---
+============================================================
+
+
+[2026-06-30 02:23:45] CMD: npm install -g create-react-app 2>&1 | tail -3
+============================================================
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.18.0
+npm notice To update run: npm install -g npm@11.18.0
+npm notice
+============================================================
+
+
+[2026-06-30 02:24:18] CMD: npm install -g vite 2>&1 | tail -3
+============================================================
+8 packages are looking for funding
+  run `npm fund` for details
+============================================================
+
+
+[2026-06-30 02:24:19] CMD: echo 'node:' v20.20.2 '| npm:' 10.8.2 '| python:' Python 3.11.15 '| java:' sh: 1: java: not found '| go:' N/A
+============================================================
+node: v20.20.2 | npm: 10.8.2 | python: Python 3.11.15 | java: bash: java: command not found | go: N/A
+============================================================
+
+
+[2026-06-30 02:24:25] CMD: npm install
+============================================================
+⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋
+added 2 packages, and audited 155 packages in 5s
+⠋
+⠋43 packages are looking for funding
+⠋  run `npm fund` for details
+⠋
+found 0 vulnerabilities
+⠋
+============================================================
+
+
