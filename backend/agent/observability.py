@@ -54,6 +54,8 @@ class ObservabilityManager:
             return
         self._initialized = True
         self._dsn = dsn or settings.database_url
+        self._use_memory = False
+        self._memory_logs: list[dict] = []
         self._ensure_table()
         
         # Thread-safe queue for asynchronous database writes
@@ -111,13 +113,18 @@ class ObservabilityManager:
                     parent_span_id = None
                 
                 # Check connection status
+                if self._use_memory:
+                    self._memory_logs.append({"session_id": session_id, "agent_name": agent_name, "event_type": event_type, "description": description})
+                    self._queue.task_done() if hasattr(self._queue, 'task_done') else None
+                    continue
+
                 if conn is None or conn.closed:
                     try:
                         conn = psycopg.connect(self._dsn)
                     except Exception as e:
-                        logger.error("obs_db_connect_failed_worker", error=str(e))
-                        time.sleep(2)
-                        self._queue.put(task)
+                        logger.warning("obs_db_fallback_memory", error=str(e))
+                        self._use_memory = True
+                        self._memory_logs.append({"session_id": session_id, "agent_name": agent_name, "event_type": event_type, "description": description})
                         continue
                 
                 try:

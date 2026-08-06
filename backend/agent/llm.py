@@ -9,7 +9,6 @@ import asyncio
 import random
 from typing import Optional, List, Any
 
-from langchain_community.chat_models import ChatLiteLLM
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.callbacks import CallbackManagerForLLMRun, AsyncCallbackManagerForLLMRun
 from langchain_core.messages import BaseMessage, AIMessage
@@ -51,7 +50,7 @@ class LLMFactory:
         elif provider == "gemini":
             llm = self._create_gemini(model_name, temperature, max_tokens, role)
         elif model_name:
-            llm = ChatLiteLLM(model=model_name, temperature=temperature, max_tokens=max_tokens)
+            llm = self._create_openai(model_name, temperature, max_tokens)
         else:
             raise ValueError(f"Unknown provider: {provider}")
 

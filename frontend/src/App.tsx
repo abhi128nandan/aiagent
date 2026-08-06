@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
 import { useAgentStore } from './store/agentStore';
 import { useAgentStream } from './hooks/useAgentStream';
 import { Chat } from './components/Chat';
@@ -8,18 +9,52 @@ import { FileBrowser } from './components/FileBrowser';
 import { SessionSidebar } from './components/SessionSidebar';
 import { SandboxPanel } from './components/SandboxPanel';
 import { BrowserPreview } from './components/BrowserPreview';
-import { EventLog } from './components/EventLog';
 import { TokenUsage } from './components/TokenUsage';
 import { SettingsModal } from './components/SettingsModal';
 import { ObservabilityDashboard } from './components/ObservabilityDashboard';
 import { ArchitectureView } from './components/ArchitectureView';
-import { Code2, Settings, Terminal, BarChart2, LayoutGrid } from 'lucide-react';
+import { WorkspaceDashboard } from './components/WorkspaceDashboard';
+import { WorkspaceDebug } from './components/WorkspaceDebug';
+import { YantrikaLandingPage } from './components/YantrikaLandingPage';
+import { IntegrationsPage } from './components/IntegrationsPage';
+import {
+  Code2,
+  Settings,
+  Sparkles,
+  Code,
+  Globe,
+  Bug,
+  LayoutGrid,
+  BarChart2,
+  FolderTree,
+  PanelBottomClose,
+  PanelBottomOpen,
+  LayoutDashboard,
+  Layers,
+  PanelLeftClose,
+  PanelLeftOpen,
+  HelpCircle,
+  FolderKanban
+} from 'lucide-react';
+
+export type AppView = 'landing' | 'app';
+export type WorkspaceMode = 'dashboard' | 'projects' | 'builder' | 'ide' | 'preview' | 'debug' | 'integrations' | 'system';
 
 function App() {
-  const { activeSessionId, fetchSessions, fetchArchitecturalPlan } = useAgentStore();
+  const { activeSessionId, fetchSessions, fetchArchitecturalPlan, status, connectionState, filesBySession } = useAgentStore();
   const { refreshSandbox } = useAgentStream();
+  const [appView, setAppView] = useState<AppView>('landing');
   const [showSettings, setShowSettings] = useState(false);
-  const [activeTab, setActiveTab] = useState<'editor' | 'architecture' | 'observability'>('editor');
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('dashboard');
+  const [systemSubTab, setSystemSubTab] = useState<'architecture' | 'observability'>('architecture');
+  const [sidebarExpanded, setSidebarExpanded] = useState(true);
+
+  // IDE view internal panel states
+  const [showFileExplorer, setShowFileExplorer] = useState(true);
+  const [showTerminal, setShowTerminal] = useState(true);
+
+  const files = filesBySession[activeSessionId] || {};
+  const fileCount = Object.keys(files).length;
 
   useEffect(() => {
     fetchSessions();
@@ -32,104 +67,306 @@ function App() {
     }
   }, [activeSessionId, refreshSandbox, fetchArchitecturalPlan]);
 
-  return (
-    <div className="h-screen w-screen bg-background flex flex-col overflow-hidden font-sans">
-      <header className="h-12 border-b border-border bg-surface flex items-center px-4 shrink-0 justify-between">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 text-brand font-semibold tracking-wide">
-            <Code2 size={20} />
-            <span>Antigravity Agent Builder</span>
-          </div>
-          
-          {/* Tab Switcher */}
-          <div className="flex items-center bg-[#181920] border border-slate-800 rounded-lg p-0.5 text-xs">
-            <button
-              onClick={() => setActiveTab('editor')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition-all ${
-                activeTab === 'editor'
-                  ? 'bg-brand text-white shadow-sm font-semibold'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Terminal size={13} />
-              IDE Workspace
-            </button>
-            <button
-              onClick={() => setActiveTab('architecture')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition-all ${
-                activeTab === 'architecture'
-                  ? 'bg-brand text-white shadow-sm font-semibold'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <LayoutGrid size={13} />
-              System Architecture
-            </button>
-            <button
-              onClick={() => setActiveTab('observability')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition-all ${
-                activeTab === 'observability'
-                  ? 'bg-brand text-white shadow-sm font-semibold'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <BarChart2 size={13} />
-              AI Observability
-            </button>
-          </div>
-        </div>
+  // Semantic Status Badge Helper
+  const getStatusBadge = () => {
+    if (connectionState === 'error' || status === 'error') {
+      return { dot: 'bg-rose-500', label: 'Error', bg: 'bg-rose-500/10 border-rose-500/20 text-rose-600' };
+    }
+    if (status === 'planning') {
+      return { dot: 'bg-amber-500 animate-pulse', label: 'Planning', bg: 'bg-amber-500/10 border-amber-500/20 text-amber-600' };
+    }
+    if (status.startsWith('running') || connectionState === 'open') {
+      return { dot: 'bg-emerald-500 animate-ping', label: 'Running', bg: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' };
+    }
+    return { dot: 'bg-slate-400', label: 'Idle', bg: 'bg-slate-100 border-slate-200 text-slate-600' };
+  };
 
-        <div className="flex items-center gap-3">
-          <TokenUsage />
+  const statusBadge = getStatusBadge();
+
+  // Navigation items
+  const navItems: { key: WorkspaceMode; icon: React.ReactNode; label: string }[] = [
+    { key: 'dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
+    { key: 'projects', icon: <FolderKanban size={18} />, label: 'Projects' },
+    { key: 'builder', icon: <Sparkles size={18} />, label: 'Builder' },
+    { key: 'ide', icon: <Code size={18} />, label: 'Workspace' },
+    { key: 'preview', icon: <Globe size={18} />, label: 'Preview' },
+    { key: 'debug', icon: <Bug size={18} />, label: 'Debug' },
+    { key: 'integrations', icon: <Layers size={18} />, label: 'Integrations' },
+  ];
+
+  // ─── Landing Page Experience ───
+  if (appView === 'landing') {
+    return (
+      <div className="h-screen w-screen overflow-y-auto">
+        <YantrikaLandingPage
+          onStartBuilding={() => {
+            window.scrollTo({ top: 0, behavior: 'instant' });
+            setAppView('app');
+            setWorkspaceMode('builder');
+          }}
+          onOpenApp={(mode?: string) => {
+            window.scrollTo({ top: 0, behavior: 'instant' });
+            setAppView('app');
+            if (mode) {
+              setWorkspaceMode(mode.toLowerCase() as WorkspaceMode);
+            } else {
+              setWorkspaceMode('dashboard');
+            }
+          }}
+        />
+        {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      </div>
+    );
+  }
+
+  // ─── Application Workspace Experience ───
+  return (
+    <div className="h-screen w-screen bg-background flex overflow-hidden font-sans text-text">
+
+      {/* ─── Collapsible Left Sidebar ─── */}
+      <aside className={`sidebar-base ${sidebarExpanded ? 'sidebar-expanded' : 'sidebar-collapsed'}`}>
+        {/* Sidebar Header: Logo + Toggle */}
+        <div className="h-14 px-3 flex items-center justify-between border-b border-border shrink-0">
+          {sidebarExpanded ? (
+            <div className="flex items-center gap-2 font-extrabold text-sm tracking-tight select-none overflow-hidden whitespace-nowrap">
+              <Code2 size={20} className="text-brand shrink-0" />
+              <span>Yantrika <span className="text-brand">AI</span></span>
+            </div>
+          ) : (
+            <Code2 size={20} className="text-brand mx-auto" />
+          )}
           <button
-            onClick={() => setShowSettings(true)}
-            className="p-1.5 rounded-md border border-border bg-surface text-text-muted hover:border-brand hover:text-brand transition-all hover:shadow-[0_0_8px_var(--color-brand-muted)]"
-            title="Open Settings"
+            onClick={() => setSidebarExpanded(!sidebarExpanded)}
+            className="p-1 rounded-lg text-text-muted hover:text-text hover:bg-surface-hover transition-colors shrink-0"
+            title={sidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
           >
-            <Settings size={16} />
+            {sidebarExpanded ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
           </button>
         </div>
-      </header>
 
-      <div className="flex-1 flex overflow-hidden p-2 gap-2">
-        <div className="flex flex-col rounded-xl overflow-hidden border border-border bg-surface shadow-lg">
-          <SessionSidebar />
-        </div>
+        {/* Navigation Items */}
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2 space-y-0.5 scrollbar-hide">
+          {navItems.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setWorkspaceMode(item.key)}
+              className={`sidebar-item w-full ${workspaceMode === item.key ? 'sidebar-item-active' : ''}`}
+              title={!sidebarExpanded ? item.label : undefined}
+            >
+              <span className="shrink-0">{item.icon}</span>
+              {sidebarExpanded && (
+                <span className="truncate text-xs">{item.label}</span>
+              )}
+            </button>
+          ))}
+        </nav>
 
-        {/* Left pane: Chat */}
-        <div className="w-[380px] flex-shrink-0 flex flex-col rounded-xl overflow-hidden border border-border bg-surface shadow-lg relative">
-          <Chat />
+        {/* Sidebar Footer: Settings, Help, Status */}
+        <div className="border-t border-border py-2 px-2 space-y-0.5 shrink-0">
+          <button
+            onClick={() => setShowSettings(true)}
+            className="sidebar-item w-full"
+            title={!sidebarExpanded ? 'Settings' : undefined}
+          >
+            <Settings size={18} className="shrink-0" />
+            {sidebarExpanded && <span className="truncate text-xs">Settings</span>}
+          </button>
+          <button
+            className="sidebar-item w-full"
+            title={!sidebarExpanded ? 'Help & Docs' : undefined}
+          >
+            <HelpCircle size={18} className="shrink-0" />
+            {sidebarExpanded && <span className="truncate text-xs">Help & Docs</span>}
+          </button>
+
+          {/* Status Badge */}
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold ${statusBadge.bg}`}>
+            <span className={`h-2 w-2 rounded-full ${statusBadge.dot} shrink-0`} />
+            {sidebarExpanded && <span className="truncate">{statusBadge.label}</span>}
+          </div>
         </div>
-        
-        {/* Middle pane: IDE Workspace or Observability Dashboard */}
-        <div className="flex-1 flex flex-col rounded-xl overflow-hidden border border-border bg-[#1e1e1e] shadow-lg relative">
-          {activeTab === 'editor' ? (
-            <>
+      </aside>
+
+      {/* ─── Main Content Area ─── */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Thin Top Bar (contextual) */}
+        <header className="h-11 border-b border-border bg-surface flex items-center px-4 shrink-0 justify-between z-20">
+          <div className="flex items-center gap-3">
+            {/* Breadcrumb */}
+            <span className="text-xs font-semibold text-text">
+              {navItems.find(n => n.key === workspaceMode)?.label || 'Dashboard'}
+            </span>
+
+            {/* IDE-specific toggles */}
+            {workspaceMode === 'ide' && (
+              <div className="flex items-center gap-1 border-l border-border pl-3 ml-1">
+                <button
+                  onClick={() => setShowFileExplorer(!showFileExplorer)}
+                  className={`p-1.5 rounded-lg text-xs transition-colors ${
+                    showFileExplorer ? 'text-brand bg-brand-muted' : 'text-text-muted hover:text-text'
+                  }`}
+                  title={showFileExplorer ? 'Hide File Explorer' : 'Show File Explorer'}
+                >
+                  <FolderTree size={14} />
+                </button>
+                <button
+                  onClick={() => setShowTerminal(!showTerminal)}
+                  className={`p-1.5 rounded-lg text-xs transition-colors ${
+                    showTerminal ? 'text-brand bg-brand-muted' : 'text-text-muted hover:text-text'
+                  }`}
+                  title={showTerminal ? 'Hide Terminal' : 'Show Terminal'}
+                >
+                  {showTerminal ? <PanelBottomClose size={14} /> : <PanelBottomOpen size={14} />}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Progressive CTA */}
+            {workspaceMode === 'builder' && fileCount > 0 && (
+              <button
+                onClick={() => setWorkspaceMode('ide')}
+                className="btn-primary h-7 text-xs px-3 shadow-xs"
+              >
+                Open Workspace →
+              </button>
+            )}
+            <TokenUsage />
+            <button
+              onClick={() => { setAppView('landing'); }}
+              className="text-xs text-text-muted hover:text-brand font-medium transition-colors"
+              title="Back to landing page"
+            >
+              Home
+            </button>
+          </div>
+        </header>
+
+        {/* ─── Workspace Content ─── */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Dashboard */}
+          {workspaceMode === 'dashboard' && (
+            <WorkspaceDashboard
+              onOpenBuilder={() => setWorkspaceMode('builder')}
+              onOpenIDE={() => setWorkspaceMode('ide')}
+            />
+          )}
+
+          {/* Projects — reuses SessionSidebar + Dashboard for session list */}
+          {workspaceMode === 'projects' && (
+            <div className="flex-1 flex overflow-hidden">
+              <div className="w-64 border-r border-border bg-surface shrink-0">
+                <SessionSidebar />
+              </div>
+              <WorkspaceDashboard
+                onOpenBuilder={() => setWorkspaceMode('builder')}
+                onOpenIDE={() => setWorkspaceMode('ide')}
+              />
+            </div>
+          )}
+
+          {/* Builder */}
+          {workspaceMode === 'builder' && (
+            <div className="flex-1 flex overflow-hidden bg-background">
+              <div className="border-r border-border bg-surface">
+                <SessionSidebar />
+              </div>
+              <div className="flex-1 h-full max-w-4xl mx-auto border-x border-border bg-surface shadow-xl">
+                <Chat />
+              </div>
+            </div>
+          )}
+
+          {/* Workspace (IDE) */}
+          {workspaceMode === 'ide' && (
+            <div className="flex-1 flex flex-col bg-background overflow-hidden">
               <SandboxPanel />
-              <div className="flex-1 flex overflow-hidden relative">
-                <div className="w-[200px] flex-shrink-0 border-r border-border bg-surface">
-                   <FileBrowser />
-                </div>
-                <div className="flex-1 h-full bg-[#1e1e1e]">
-                  <CodeEditor />
-                </div>
-                <div className="w-[360px] flex-shrink-0 border-l border-border bg-surface">
-                  <BrowserPreview />
-                </div>
-                <div className="w-[260px] flex-shrink-0 border-l border-border bg-surface">
-                  <EventLog />
+              <PanelGroup direction="vertical" className="flex-1">
+                <Panel defaultSize={showTerminal ? 75 : 100} minSize={40}>
+                  <PanelGroup direction="horizontal" className="h-full">
+                    {showFileExplorer && (
+                      <>
+                        <Panel defaultSize={18} minSize={12} maxSize={28}>
+                          <div className="h-full border-r border-[#E9DED2]/20 bg-white">
+                            <FileBrowser />
+                          </div>
+                        </Panel>
+                        <PanelResizeHandle className="resize-handle-horizontal" />
+                      </>
+                    )}
+                    <Panel defaultSize={showFileExplorer ? 82 : 100} minSize={50}>
+                      <div className="h-full bg-[#12141a]">
+                        <CodeEditor />
+                      </div>
+                    </Panel>
+                  </PanelGroup>
+                </Panel>
+                {showTerminal && (
+                  <>
+                    <PanelResizeHandle className="resize-handle-vertical" />
+                    <Panel defaultSize={25} minSize={12} maxSize={60}>
+                      <div className="h-full border-t border-[#E9DED2]/20 bg-white">
+                        <TerminalLog />
+                      </div>
+                    </Panel>
+                  </>
+                )}
+              </PanelGroup>
+            </div>
+          )}
+
+          {/* Preview */}
+          {workspaceMode === 'preview' && (
+            <div className="flex-1 h-full w-full">
+              <BrowserPreview />
+            </div>
+          )}
+
+          {/* Debug */}
+          {workspaceMode === 'debug' && (
+            <div className="flex-1 h-full w-full">
+              <WorkspaceDebug />
+            </div>
+          )}
+
+          {/* Integrations */}
+          {workspaceMode === 'integrations' && (
+            <div className="flex-1 h-full w-full">
+              <IntegrationsPage />
+            </div>
+          )}
+
+          {/* System Administration */}
+          {workspaceMode === 'system' && (
+            <div className="flex-1 flex flex-col bg-warm-gradient overflow-hidden">
+              <div className="h-10 border-b border-[#E9DED2] bg-white px-4 flex items-center justify-between shrink-0 text-xs">
+                <span className="font-bold text-[#1F2937]">System Administration</span>
+                <div className="flex items-center bg-[#FAF8F4] border border-[#E9DED2] rounded-lg p-0.5">
+                  <button
+                    onClick={() => setSystemSubTab('architecture')}
+                    className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-md transition-all ${
+                      systemSubTab === 'architecture' ? 'bg-[#F47A20] text-white font-semibold' : 'text-[#6B7280] hover:text-[#1F2937]'
+                    }`}
+                  >
+                    <LayoutGrid size={12} />
+                    Architecture Map
+                  </button>
+                  <button
+                    onClick={() => setSystemSubTab('observability')}
+                    className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-md transition-all ${
+                      systemSubTab === 'observability' ? 'bg-[#F47A20] text-white font-semibold' : 'text-[#6B7280] hover:text-[#1F2937]'
+                    }`}
+                  >
+                    <BarChart2 size={12} />
+                    AI Observability
+                  </button>
                 </div>
               </div>
-              
-              {/* Bottom pane: Terminal logs */}
-              <div className="h-[250px] flex-shrink-0 border-t border-border bg-surface">
-                <TerminalLog />
+              <div className="flex-1 overflow-hidden">
+                {systemSubTab === 'architecture' ? <ArchitectureView /> : <ObservabilityDashboard />}
               </div>
-            </>
-          ) : activeTab === 'architecture' ? (
-            <ArchitectureView />
-          ) : (
-            <ObservabilityDashboard />
+            </div>
           )}
         </div>
       </div>

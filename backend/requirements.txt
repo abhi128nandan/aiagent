@@ -15,7 +15,7 @@ websockets
 pymupdf
 docx2txt
 pexpect
-litellm
+litellm==1.48.0
 playwright
 html2text
 pydantic-settings
@@ -35,5 +35,6 @@ sentence-transformers
 chromadb
 # ── Phase 5: Web Research ──
 ddgs
+python-multipart
 # ── Phase 6: Autonomous Code Analysis Engine ──
 networkx

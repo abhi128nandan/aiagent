@@ -1,3 +1,4 @@
+import os
 from contextlib import AsyncExitStack
 from typing import Any, cast
 
@@ -157,13 +158,22 @@ async def _create_checkpointer():
     Try to create a PostgreSQL checkpointer for durable state persistence.
     Falls back to in-memory if the database is unavailable.
     """
+    if os.environ.get("USE_MEMORY_CHECKPOINTER", "false").lower() in ("true", "1", "yes"):
+        logger.info("checkpointer_init", backend="memory", reason="USE_MEMORY_CHECKPOINTER set")
+        return MemorySaver()
+
     try:
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-        checkpointer = await _checkpointer_stack.enter_async_context(
+        # Create isolated exit stack for Postgres
+        pg_stack = AsyncExitStack()
+        checkpointer = await pg_stack.enter_async_context(
             AsyncPostgresSaver.from_conn_string(settings.database_url)
         )
         await checkpointer.setup()  # creates tables if they don't exist
+        
+        # Transfer context to global stack only after successful setup
+        _checkpointer_stack.push_async_callback(pg_stack.aclose)
         logger.info("checkpointer_init", backend="postgres")
         return checkpointer
     except Exception as e:
@@ -689,5 +699,9 @@ async def get_graph():
     """Return a cached compiled graph (singleton per process)."""
     global _compiled_graph
     if _compiled_graph is None:
-        _compiled_graph = await build_graph()
+        try:
+            _compiled_graph = await build_graph()
+        except Exception as e:
+            logger.warning("get_graph_failed_rebuilding_with_memory", error=str(e))
+            _compiled_graph = await build_graph(checkpointer=MemorySaver())
     return _compiled_graph

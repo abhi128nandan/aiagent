@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api/backend';
 import type { LLMProfile, LLMProfileCreate } from '../api/backend';
-import { Settings, Sliders, Cpu, Trash2, CheckCircle2, Circle, Plus, X, Loader2 } from 'lucide-react';
+import { Settings, Sliders, Cpu, Trash2, CheckCircle2, Circle, Plus, X, Loader2, Box, Beaker, Info } from 'lucide-react';
 
 interface SettingsModalProps {
     onClose: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
-    const [activeTab, setActiveTab] = useState<'profiles' | 'general'>('profiles');
+    const [activeTab, setActiveTab] = useState<'general' | 'profiles' | 'sandbox' | 'experimental' | 'about'>('general');
     const [profiles, setProfiles] = useState<LLMProfile[]>([]);
     const [generalSettings, setGeneralSettings] = useState<Record<string, any>>({});
     const [loading, setLoading] = useState(true);
@@ -55,7 +55,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             };
             await api.settings.profiles.create(payload);
             setShowAddForm(false);
-            // Reset form
             setNewTemp(0.2);
             setNewMaxTokens('');
             setNewIsDefault(false);
@@ -105,7 +104,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
         }
     };
 
-    // Auto-select models based on provider selection to assist the user
     useEffect(() => {
         if (newProvider === 'gemini') {
             setNewModel('gemini/gemini-2.5-flash');
@@ -119,285 +117,120 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     }, [newProvider]);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-            <div className="bg-surface w-full max-w-2xl rounded-xl border border-border shadow-2xl flex flex-col max-h-[85vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 font-sans">
+            <div className="bg-surface w-full max-w-2xl rounded-2xl border border-border shadow-2xl flex flex-col max-h-[85vh] overflow-hidden text-text">
                 {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-border bg-surface-hover rounded-t-xl">
-                    <div className="flex items-center gap-2 text-text font-medium">
+                <div className="flex items-center justify-between p-4 border-b border-border bg-surface shrink-0">
+                    <div className="flex items-center gap-2 text-text font-bold text-sm">
                         <Settings size={18} className="text-brand" />
-                        <h2>Application Settings</h2>
+                        <h2>Platform Settings</h2>
                     </div>
                     <button 
                         onClick={onClose}
-                        className="p-1.5 hover:bg-red-900/50 text-text-muted hover:text-red-400 rounded transition-colors"
+                        className="p-1.5 hover:bg-surface-hover text-text-muted hover:text-text rounded-lg transition-colors"
                     >
                         <X size={18} />
                     </button>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex border-b border-border bg-surface shrink-0">
-                    <button
-                        onClick={() => setActiveTab('profiles')}
-                        className={`flex-1 py-3 px-4 flex items-center justify-center gap-2 border-b-2 text-sm font-medium transition-all ${
-                            activeTab === 'profiles'
-                                ? 'border-brand text-brand bg-brand-muted/10'
-                                : 'border-transparent text-text-muted hover:text-text hover:bg-surface-hover'
-                        }`}
-                    >
-                        <Cpu size={16} />
-                        <span>LLM Profiles</span>
-                    </button>
+                <div className="flex border-b border-border bg-background shrink-0 text-xs font-semibold overflow-x-auto">
                     <button
                         onClick={() => setActiveTab('general')}
-                        className={`flex-1 py-3 px-4 flex items-center justify-center gap-2 border-b-2 text-sm font-medium transition-all ${
+                        className={`py-3 px-4 flex items-center gap-2 border-b-2 transition-all ${
                             activeTab === 'general'
-                                ? 'border-brand text-brand bg-brand-muted/10'
-                                : 'border-transparent text-text-muted hover:text-text hover:bg-surface-hover'
+                                ? 'border-brand text-brand bg-surface'
+                                : 'border-transparent text-text-muted hover:text-text'
                         }`}
                     >
-                        <Sliders size={16} />
-                        <span>General Config</span>
+                        <Sliders size={14} />
+                        General
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('profiles')}
+                        className={`py-3 px-4 flex items-center gap-2 border-b-2 transition-all ${
+                            activeTab === 'profiles'
+                                ? 'border-brand text-brand bg-surface'
+                                : 'border-transparent text-text-muted hover:text-text'
+                        }`}
+                    >
+                        <Cpu size={14} />
+                        LLM Profiles
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('sandbox')}
+                        className={`py-3 px-4 flex items-center gap-2 border-b-2 transition-all ${
+                            activeTab === 'sandbox'
+                                ? 'border-brand text-brand bg-surface'
+                                : 'border-transparent text-text-muted hover:text-text'
+                        }`}
+                    >
+                        <Box size={14} />
+                        Sandbox
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('experimental')}
+                        className={`py-3 px-4 flex items-center gap-2 border-b-2 transition-all ${
+                            activeTab === 'experimental'
+                                ? 'border-brand text-brand bg-surface'
+                                : 'border-transparent text-text-muted hover:text-text'
+                        }`}
+                    >
+                        <Beaker size={14} />
+                        Experimental
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('about')}
+                        className={`py-3 px-4 flex items-center gap-2 border-b-2 transition-all ${
+                            activeTab === 'about'
+                                ? 'border-brand text-brand bg-surface'
+                                : 'border-transparent text-text-muted hover:text-text'
+                        }`}
+                    >
+                        <Info size={14} />
+                        About
                     </button>
                 </div>
 
                 {/* Content */}
-                <div className="p-4 overflow-y-auto flex-1 min-h-[300px]">
+                <div className="p-5 overflow-y-auto flex-1 min-h-[300px] text-xs">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center h-48 text-text-muted">
                             <Loader2 size={24} className="animate-spin mb-2 text-brand" />
-                            <p className="text-sm">Loading settings...</p>
+                            <p className="text-xs">Loading settings...</p>
                         </div>
-                    ) : activeTab === 'profiles' ? (
+                    ) : activeTab === 'general' ? (
                         <div className="space-y-4">
-                            {/* Actions Header */}
-                            <div className="flex justify-between items-center">
-                                <h3 className="text-sm font-semibold text-text">Configured LLM Profiles</h3>
-                                {!showAddForm && (
-                                    <button
-                                        onClick={() => setShowAddForm(true)}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-brand hover:bg-brand-hover text-white text-xs font-semibold rounded-md shadow-md transition-all"
-                                    >
-                                        <Plus size={14} />
-                                        Add Profile
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Add Form */}
-                            {showAddForm && (
-                                <form onSubmit={handleCreateProfile} className="p-4 border border-brand bg-brand-muted/5 rounded-lg space-y-3">
-                                    <div className="flex justify-between items-center border-b border-border pb-1.5">
-                                        <span className="text-xs font-semibold text-brand">Create New LLM Profile</span>
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setShowAddForm(false)}
-                                            className="text-text-muted hover:text-text"
-                                        >
-                                            <X size={14} />
-                                        </button>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3 text-xs">
-                                        <div className="space-y-1">
-                                            <label className="text-text-muted block">Provider</label>
-                                            <select
-                                                value={newProvider}
-                                                onChange={e => setNewProvider(e.target.value)}
-                                                className="w-full bg-surface-hover border border-border rounded px-2.5 py-1.5 text-text focus:border-brand outline-none"
-                                            >
-                                                <option value="gemini">Gemini</option>
-                                                <option value="groq">Groq</option>
-                                                <option value="ollama">Ollama (Local)</option>
-                                                <option value="openai">OpenAI</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-text-muted block">Model Identifier</label>
-                                            <input
-                                                type="text"
-                                                required
-                                                value={newModel}
-                                                onChange={e => setNewModel(e.target.value)}
-                                                placeholder="e.g. gemini/gemini-2.5-flash"
-                                                className="w-full bg-surface-hover border border-border rounded px-2.5 py-1.5 text-text focus:border-brand outline-none"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-text-muted block">Temperature ({newTemp})</label>
-                                            <input
-                                                type="range"
-                                                min="0"
-                                                max="1"
-                                                step="0.1"
-                                                value={newTemp}
-                                                onChange={e => setNewTemp(parseFloat(e.target.value))}
-                                                className="w-full h-1.5 bg-surface-hover rounded-lg appearance-none cursor-pointer accent-brand"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-text-muted block">Max Tokens (Optional)</label>
-                                            <input
-                                                type="number"
-                                                value={newMaxTokens}
-                                                onChange={e => setNewMaxTokens(e.target.value === '' ? '' : parseInt(e.target.value))}
-                                                placeholder="Unlimited"
-                                                className="w-full bg-surface-hover border border-border rounded px-2.5 py-1.5 text-text focus:border-brand outline-none"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center justify-between pt-2">
-                                        <label className="flex items-center gap-2 text-xs text-text-muted cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={newIsDefault}
-                                                onChange={e => setNewIsDefault(e.target.checked)}
-                                                className="rounded border-border text-brand focus:ring-brand bg-surface-hover"
-                                            />
-                                            Set as default profile
-                                        </label>
-                                        <div className="flex gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowAddForm(false)}
-                                                className="px-3 py-1.5 border border-border hover:bg-surface-hover rounded text-xs font-semibold"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                type="submit"
-                                                disabled={actionLoading === 'create'}
-                                                className="px-4 py-1.5 bg-brand hover:bg-brand-hover disabled:bg-brand/50 text-white rounded text-xs font-semibold flex items-center gap-1"
-                                            >
-                                                {actionLoading === 'create' && <Loader2 size={12} className="animate-spin" />}
-                                                Save Profile
-                                            </button>
-                                        </div>
-                                    </div>
-                                </form>
-                            )}
-
-                            {/* Profiles List */}
-                            <div className="space-y-2">
-                                {profiles.length === 0 ? (
-                                    <p className="text-xs text-text-muted text-center py-8">No custom LLM profiles found. Falling back to backend defaults (.env).</p>
-                                ) : (
-                                    profiles.map(p => (
-                                        <div 
-                                            key={p.id} 
-                                            className={`p-3 rounded-lg border flex items-center justify-between transition-all ${
-                                                p.is_default 
-                                                    ? 'border-brand/60 bg-brand-muted/5' 
-                                                    : 'border-border bg-surface-hover/30 hover:bg-surface-hover/60'
-                                            }`}
-                                        >
-                                            <div className="space-y-1">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-semibold text-xs text-text uppercase tracking-wider bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700">
-                                                        {p.provider}
-                                                    </span>
-                                                    <span className="font-mono text-xs text-text font-bold">
-                                                        {p.model}
-                                                    </span>
-                                                    {p.is_default && (
-                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand/20 text-brand border border-brand/30 font-semibold uppercase">
-                                                            Default
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="text-[11px] text-text-muted flex gap-4">
-                                                    <span>Temp: <strong className="text-gray-300">{p.temperature}</strong></span>
-                                                    {p.max_tokens && <span>Max Tokens: <strong className="text-gray-300">{p.max_tokens}</strong></span>}
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center gap-2">
-                                                {p.is_default ? (
-                                                    <span className="text-brand p-1.5" title="Active default model">
-                                                        <CheckCircle2 size={16} />
-                                                    </span>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => handleSetDefaultProfile(p.id)}
-                                                        disabled={actionLoading !== null}
-                                                        className="p-1.5 hover:bg-surface text-text-muted hover:text-text rounded transition-colors"
-                                                        title="Set as default model"
-                                                    >
-                                                        {actionLoading === `default-${p.id}` ? (
-                                                            <Loader2 size={16} className="animate-spin text-brand" />
-                                                        ) : (
-                                                            <Circle size={16} />
-                                                        )}
-                                                    </button>
-                                                )}
-                                                <button
-                                                    onClick={() => handleDeleteProfile(p.id)}
-                                                    disabled={actionLoading !== null}
-                                                    className="p-1.5 hover:bg-red-950/40 text-text-muted hover:text-red-400 rounded transition-colors"
-                                                    title="Delete profile"
-                                                >
-                                                    {actionLoading === `delete-${p.id}` ? (
-                                                        <Loader2 size={16} className="animate-spin text-red-400" />
-                                                    ) : (
-                                                        <Trash2 size={16} />
-                                                    )}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-semibold text-text">General Sandbox & Agent Configurations</h3>
+                            <h3 className="text-sm font-bold text-text">General Configurations</h3>
                             
-                            <div className="space-y-4">
-                                {/* Sandbox Timeout */}
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border border-border bg-surface-hover/20 rounded-lg gap-2">
+                            <div className="space-y-3">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 border border-border bg-surface rounded-xl gap-2 shadow-xs">
                                     <div className="space-y-0.5">
-                                        <h4 className="text-xs font-semibold text-text">Sandbox Timeout</h4>
-                                        <p className="text-[11px] text-text-muted">Maximum execution time for running commands inside the sandbox (seconds).</p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="number"
-                                            value={generalSettings.sandbox_timeout || 30}
-                                            onChange={e => handleUpdateSetting('sandbox_timeout', parseInt(e.target.value))}
-                                            className="w-20 bg-surface border border-border rounded px-2 py-1 text-xs text-text text-center focus:border-brand outline-none font-semibold"
-                                        />
-                                        {actionLoading === 'sandbox_timeout' && <Loader2 size={14} className="animate-spin text-brand animate-duration-1000" />}
-                                    </div>
-                                </div>
-
-                                {/* Max Retries */}
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border border-border bg-surface-hover/20 rounded-lg gap-2">
-                                    <div className="space-y-0.5">
-                                        <h4 className="text-xs font-semibold text-text">Max LLM Iterations</h4>
-                                        <p className="text-[11px] text-text-muted">Maximum repair iterations before the agent considers a file build cycle failed.</p>
+                                        <h4 className="font-bold text-text">Max LLM Repair Iterations</h4>
+                                        <p className="text-text-muted">Maximum repair loops before the agent reports build failure.</p>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <input
                                             type="number"
                                             value={generalSettings.max_retries || 5}
                                             onChange={e => handleUpdateSetting('max_retries', parseInt(e.target.value))}
-                                            className="w-20 bg-surface border border-border rounded px-2 py-1 text-xs text-text text-center focus:border-brand outline-none font-semibold"
+                                            className="w-20 bg-background border border-border rounded-lg px-2.5 py-1 text-xs text-text text-center focus:border-brand outline-none font-bold"
                                         />
                                         {actionLoading === 'max_retries' && <Loader2 size={14} className="animate-spin text-brand" />}
                                     </div>
                                 </div>
 
-                                {/* Debug Mode */}
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border border-border bg-surface-hover/20 rounded-lg gap-2">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 border border-border bg-surface rounded-xl gap-2 shadow-xs">
                                     <div className="space-y-0.5">
-                                        <h4 className="text-xs font-semibold text-text">Debug Log Mode</h4>
-                                        <p className="text-[11px] text-text-muted">Enables verbose tracing of system internals in logs and files.</p>
+                                        <h4 className="font-bold text-text">Debug Log Mode</h4>
+                                        <p className="text-text-muted">Enables verbose internal execution tracing in console and log files.</p>
                                     </div>
-                                    <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-3">
                                         <button
                                             onClick={() => handleUpdateSetting('debug_mode', !generalSettings.debug_mode)}
                                             disabled={actionLoading === 'debug_mode'}
-                                            className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                                generalSettings.debug_mode ? 'bg-brand' : 'bg-zinc-700'
+                                            className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                                                generalSettings.debug_mode ? 'bg-brand' : 'bg-slate-300'
                                             }`}
                                         >
                                             <span
@@ -410,48 +243,190 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                                     </div>
                                 </div>
                             </div>
-                            
-                            <h3 className="text-sm font-semibold text-text mt-6">Role-Based Model Routing</h3>
-                            <div className="space-y-4">
-                                {[
-                                    { key: 'role_profile_planner', label: 'Planner Model', desc: 'Used for architecture and detail planning.' },
-                                    { key: 'role_profile_backend', label: 'Backend Subagent Model', desc: 'Used for backend API/service implementation.' },
-                                    { key: 'role_profile_frontend', label: 'Frontend Subagent Model', desc: 'Used for UI component implementation.' },
-                                    { key: 'role_profile_validator', label: 'Judge/Validator Model', desc: 'Used for reviewing code and plans.' },
-                                ].map(role => (
-                                    <div key={role.key} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border border-border bg-surface-hover/20 rounded-lg gap-2">
-                                        <div className="space-y-0.5">
-                                            <h4 className="text-xs font-semibold text-text">{role.label}</h4>
-                                            <p className="text-[11px] text-text-muted">{role.desc}</p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
+                        </div>
+                    ) : activeTab === 'profiles' ? (
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-sm font-bold text-text">Configured LLM Profiles</h3>
+                                {!showAddForm && (
+                                    <button
+                                        onClick={() => setShowAddForm(true)}
+                                        className="btn-primary text-xs px-3 py-1.5"
+                                    >
+                                        <Plus size={14} />
+                                        Add Profile
+                                    </button>
+                                )}
+                            </div>
+
+                            {showAddForm && (
+                                <form onSubmit={handleCreateProfile} className="p-4 border border-brand bg-brand/5 rounded-xl space-y-3 shadow-xs">
+                                    <div className="flex justify-between items-center border-b border-border pb-2">
+                                        <span className="font-bold text-brand">Create LLM Profile</span>
+                                        <button type="button" onClick={() => setShowAddForm(false)} className="text-text-muted hover:text-text">
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <label className="text-text-muted block font-medium">Provider</label>
                                             <select
-                                                value={generalSettings[role.key] || ''}
-                                                onChange={e => handleUpdateSetting(role.key, e.target.value || null)}
-                                                className="w-48 bg-surface border border-border rounded px-2 py-1 text-xs text-text focus:border-brand outline-none"
+                                                value={newProvider}
+                                                onChange={e => setNewProvider(e.target.value)}
+                                                className="w-full bg-surface border border-border rounded-lg px-3 py-1.5 text-text focus:border-brand outline-none"
                                             >
-                                                <option value="">Use Default Profile</option>
-                                                {profiles.map(p => (
-                                                    <option key={p.id} value={p.id}>
-                                                        {p.provider.toUpperCase()}: {p.model}
-                                                    </option>
-                                                ))}
+                                                <option value="gemini">Gemini</option>
+                                                <option value="groq">Groq</option>
+                                                <option value="ollama">Ollama (Local)</option>
+                                                <option value="openai">OpenAI</option>
                                             </select>
-                                            {actionLoading === role.key && <Loader2 size={14} className="animate-spin text-brand" />}
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-text-muted block font-medium">Model Identifier</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                value={newModel}
+                                                onChange={e => setNewModel(e.target.value)}
+                                                placeholder="gemini/gemini-2.5-flash"
+                                                className="w-full bg-surface border border-border rounded-lg px-3 py-1.5 text-text focus:border-brand outline-none font-mono"
+                                            />
                                         </div>
                                     </div>
-                                ))}
+                                    <div className="flex items-center justify-between pt-2">
+                                        <label className="flex items-center gap-2 text-text-muted cursor-pointer font-medium">
+                                            <input
+                                                type="checkbox"
+                                                checked={newIsDefault}
+                                                onChange={e => setNewIsDefault(e.target.checked)}
+                                                className="rounded border-border text-brand focus:ring-brand"
+                                            />
+                                            Set as default profile
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAddForm(false)}
+                                                className="btn-secondary text-xs px-3 py-1"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                disabled={actionLoading === 'create'}
+                                                className="btn-primary text-xs px-3 py-1"
+                                            >
+                                                {actionLoading === 'create' && <Loader2 size={12} className="animate-spin" />}
+                                                Save Profile
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            )}
+
+                            <div className="space-y-2">
+                                {profiles.length === 0 ? (
+                                    <p className="text-text-muted text-center py-8">No custom LLM profiles found. Falling back to backend defaults (.env).</p>
+                                ) : (
+                                    profiles.map(p => (
+                                        <div 
+                                            key={p.id} 
+                                            className={`p-3.5 rounded-xl border flex items-center justify-between transition-all ${
+                                                p.is_default 
+                                                    ? 'border-brand/50 bg-brand/5' 
+                                                    : 'border-border bg-surface hover:bg-surface-hover'
+                                            }`}
+                                        >
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-[10px] text-text uppercase tracking-wider bg-background px-2 py-0.5 rounded border border-border">
+                                                        {p.provider}
+                                                    </span>
+                                                    <span className="font-mono font-bold text-text">
+                                                        {p.model}
+                                                    </span>
+                                                    {p.is_default && (
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand/10 text-brand border border-brand/20 font-bold uppercase">
+                                                            Default
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                {p.is_default ? (
+                                                    <span className="text-brand p-1" title="Active default model">
+                                                        <CheckCircle2 size={16} />
+                                                    </span>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleSetDefaultProfile(p.id)}
+                                                        disabled={actionLoading !== null}
+                                                        className="p-1 hover:bg-surface-hover text-text-muted hover:text-text rounded transition-colors"
+                                                        title="Set as default model"
+                                                    >
+                                                        <Circle size={16} />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => handleDeleteProfile(p.id)}
+                                                    disabled={actionLoading !== null}
+                                                    className="p-1 hover:bg-rose-50 text-text-muted hover:text-rose-600 rounded transition-colors"
+                                                    title="Delete profile"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
                             </div>
+                        </div>
+                    ) : activeTab === 'sandbox' ? (
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-bold text-text">Docker Sandbox Settings</h3>
+                            <div className="p-4 border border-border bg-surface rounded-xl space-y-3 shadow-xs">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <h4 className="font-bold text-text">Sandbox Timeout</h4>
+                                        <p className="text-text-muted">Maximum execution time for shell commands inside container (seconds).</p>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        value={generalSettings.sandbox_timeout || 30}
+                                        onChange={e => handleUpdateSetting('sandbox_timeout', parseInt(e.target.value))}
+                                        className="w-20 bg-background border border-border rounded-lg px-2.5 py-1 text-xs text-text text-center focus:border-brand outline-none font-bold"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    ) : activeTab === 'experimental' ? (
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-bold text-text">Experimental Features</h3>
+                            <div className="p-4 border border-border bg-surface rounded-xl space-y-2 text-text-muted shadow-xs">
+                                <p className="font-medium text-text">Multi-Modal Vision & Architectural Synthesis</p>
+                                <p>Experimental features are enabled by default for LLM code generation and automated testing loops.</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-4 text-center py-6">
+                            <div className="p-3 bg-brand/10 text-brand w-fit rounded-2xl mx-auto">
+                                <Info size={28} />
+                            </div>
+                            <h3 className="text-base font-bold text-text">Yantrika AI Platform</h3>
+                            <p className="text-text-muted max-w-sm mx-auto leading-relaxed">
+                                Version 2.5.0 · Autonomous Multi-Agent AI Engineering Platform with Zero-Trust Docker Sandboxes and Monaco IDE.
+                            </p>
                         </div>
                     )}
                 </div>
 
                 {/* Footer */}
-                <div className="p-3 border-t border-border bg-surface-hover text-xs text-text-muted flex items-center justify-between">
-                    <span>LLM profiles manage keys and models used for planner, coder, and validation roles.</span>
+                <div className="p-3 border-t border-border bg-background text-xs text-text-muted flex items-center justify-between shrink-0">
+                    <span>Manage configurations and LLM model profiles.</span>
                     <button
                         onClick={async () => {
-                            if (confirm('Are you sure you want to reset all settings to defaults?')) {
+                            if (confirm('Reset all settings to default configuration?')) {
                                 setActionLoading('reset');
                                 try {
                                     await api.settings.reset();
@@ -463,9 +438,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                                 }
                             }
                         }}
-                        className="text-red-400 hover:text-red-300 font-semibold transition-colors flex items-center gap-1"
+                        className="text-rose-600 hover:text-rose-700 font-bold transition-colors"
                     >
-                        {actionLoading === 'reset' && <Loader2 size={12} className="animate-spin" />}
                         Reset Settings
                     </button>
                 </div>
