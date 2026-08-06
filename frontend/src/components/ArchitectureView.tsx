@@ -53,7 +53,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
         
         // Sanitize node labels in square brackets to prevent parsing errors from unescaped quotes.
         // F[Frontend "React App"] -> F["Frontend 'React App'"]
-        cleanChart = cleanChart.replace(/\[([^\]]+)\]/g, (match, inner) => {
+        cleanChart = cleanChart.replace(/\[([^\]]+)\]/g, (_match, inner) => {
             let text = inner.trim();
             if (text.startsWith('"') && text.endsWith('"')) {
                 let core = text.substring(1, text.length - 1);

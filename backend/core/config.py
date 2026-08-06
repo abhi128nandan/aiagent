@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "agent_state"
+    USE_MEMORY_CHECKPOINTER: bool = True
 
     @property
     def database_url(self) -> str:

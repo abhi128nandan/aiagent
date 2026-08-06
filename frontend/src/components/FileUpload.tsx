@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
-import { Upload, FileText, X, CheckCircle, Loader2 } from 'lucide-react';
+import { Upload, FileText, X, CheckCircle, Loader2, Sparkles } from 'lucide-react';
 import { api } from '../api/backend';
 import { useAgentStore } from '../store/agentStore';
+import { useAgentStream } from '../hooks/useAgentStream';
 
 interface UploadResult {
     filename: string;
@@ -19,6 +20,7 @@ export const FileUpload: React.FC = () => {
     const [result, setResult] = useState<UploadResult | null>(null);
     const [error, setError] = useState<string | null>(null);
     const { addMessage, setSrsText, activeSessionId } = useAgentStore();
+    const { send } = useAgentStream();
 
     const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.doc', '.md', '.txt'];
 
@@ -40,7 +42,7 @@ export const FileUpload: React.FC = () => {
             // Store the full extracted text so the agent can use it
             setSrsText(uploadResult.full_text, activeSessionId);
 
-            // Inject the document text as a user message for the agent
+            // Inject the document text as a system preview message
             addMessage({
                 role: 'system',
                 content: `📄 Document uploaded: **${uploadResult.filename}**\n` +
@@ -50,13 +52,22 @@ export const FileUpload: React.FC = () => {
                         : '• RAG indexing not available\n') +
                     `\nPreview:\n${uploadResult.text_preview}`,
             }, activeSessionId);
+
+            // Automatically trigger the AI Agent to build the app from the uploaded SRS!
+            const prompt = `Build the complete application specified in the uploaded SRS document (${uploadResult.filename}). Implement all required features with clean code and modern styling.`;
+            const srsContext = useAgentStore.getState().consumeSrsText(activeSessionId);
+            const fullMessage = srsContext
+                ? `[SRS DOCUMENT]\n${srsContext}\n\n[USER INSTRUCTION]\n${prompt}`
+                : prompt;
+            send(fullMessage);
+
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
             setError(msg);
         } finally {
             setUploading(false);
         }
-    }, [addMessage, setSrsText, activeSessionId]);
+    }, [addMessage, setSrsText, activeSessionId, send]);
 
     const onDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -77,6 +88,12 @@ export const FileUpload: React.FC = () => {
         if (file) handleFile(file);
         e.target.value = '';
     }, [handleFile]);
+
+    const handleBuildFromSrs = (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (!result) return;
+        send(`Build the complete application specified in the uploaded SRS document (${result.filename}). Implement all required features, clean UI, and complete application logic.`);
+    };
 
     return (
         <div className="relative">
@@ -112,30 +129,41 @@ export const FileUpload: React.FC = () => {
                         {uploading ? (
                             <Loader2 size={16} className="text-brand animate-spin" />
                         ) : result ? (
-                            <CheckCircle size={16} className="text-green-400" />
+                            <CheckCircle size={16} className="text-emerald-500" />
                         ) : (
                             <Upload size={16} className="text-brand" />
                         )}
                     </div>
                     <div className="flex-1 min-w-0">
                         {uploading ? (
-                            <p className="text-xs text-text-muted">Processing document...</p>
+                            <p className="text-xs text-text-muted">Processing document & starting AI agent...</p>
                         ) : result ? (
-                            <div className="flex items-center gap-2">
-                                <FileText size={12} className="text-green-400 flex-shrink-0" />
-                                <span className="text-xs text-green-400 truncate">{result.filename}</span>
-                                <span className="text-[10px] text-text-muted">
-                                    {result.chunks_indexed} chunks
-                                </span>
-                                <button
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        setResult(null);
-                                    }}
-                                    className="ml-auto"
-                                >
-                                    <X size={12} className="text-text-muted hover:text-text" />
-                                </button>
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <FileText size={12} className="text-emerald-500 flex-shrink-0" />
+                                    <span className="text-xs text-emerald-600 font-medium truncate">{result.filename}</span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <button
+                                        type="button"
+                                        onClick={handleBuildFromSrs}
+                                        className="btn-primary h-6 text-[10px] px-2 flex items-center gap-1 shadow-xs"
+                                        title="Generate Application"
+                                    >
+                                        <Sparkles size={11} />
+                                        <span>Build App</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            setResult(null);
+                                        }}
+                                        className="p-1 rounded hover:bg-surface-hover"
+                                    >
+                                        <X size={12} className="text-text-muted hover:text-text" />
+                                    </button>
+                                </div>
                             </div>
                         ) : (
                             <>
