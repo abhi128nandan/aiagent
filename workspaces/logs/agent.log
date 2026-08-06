@@ -1,0 +1,54 @@
+[2026-06-16 13:00:57] OK (0): echo '--- HOST ENVIRONMENT ---' && uname -a && cat /etc/os-release 2>/dev/null | grep PRETTY_NAME && command -v lsof >/dev/null || echo 'WARNING: lsof is not installed. Use pkill or fuser instead.' && command -v fuser >/dev/null || echo 'WARNING: fuser is not installed. Use pkill instead.' && command -v pkill >/dev/null || echo 'WARNING: pkill is not installed.'
+
+[2026-06-22 16:06:56] FAIL (1): echo '--- HOST ENVIRONMENT ---' && uname -a && cat /etc/os-release 2>/dev/null | grep PRETTY_NAME && command -v lsof >/dev/null || echo 'WARNING: lsof is not installed. Use pkill or fuser instead.' && command -v fuser >/dev/null || echo 'WARNING: fuser is not installed. Use pkill instead.' && command -v pkill >/dev/null || echo 'WARNING: pkill is not installed.'
+
+[2026-06-22 16:07:02] FAIL (1): echo '--- HOST ENVIRONMENT ---' && uname -a && cat /etc/os-release 2>/dev/null | grep PRETTY_NAME && command -v lsof >/dev/null || echo 'WARNING: lsof is not installed. Use pkill or fuser instead.' && command -v fuser >/dev/null || echo 'WARNING: fuser is not installed. Use pkill instead.' && command -v pkill >/dev/null || echo 'WARNING: pkill is not installed.'
+
+[2026-06-22 16:07:06] OK (0): echo '--- HOST ENVIRONMENT ---' && uname -a && cat /etc/os-release 2>/dev/null | grep PRETTY_NAME && command -v lsof >/dev/null || echo 'WARNING: lsof is not installed. Use pkill or fuser instead.' && command -v fuser >/dev/null || echo 'WARNING: fuser is not installed. Use pkill instead.' && command -v pkill >/dev/null || echo 'WARNING: pkill is not installed.'
+
+[2026-06-22 16:07:09] OK (0): echo '--- HOST ENVIRONMENT ---' && uname -a && cat /etc/os-release 2>/dev/null | grep PRETTY_NAME && command -v lsof >/dev/null || echo 'WARNING: lsof is not installed. Use pkill or fuser instead.' && command -v fuser >/dev/null || echo 'WARNING: fuser is not installed. Use pkill instead.' && command -v pkill >/dev/null || echo 'WARNING: pkill is not installed.'
+
+[2026-06-22 16:07:13] OK (0): echo '--- HOST ENVIRONMENT ---' && uname -a && cat /etc/os-release 2>/dev/null | grep PRETTY_NAME && command -v lsof >/dev/null || echo 'WARNING: lsof is not installed. Use pkill or fuser instead.' && command -v fuser >/dev/null || echo 'WARNING: fuser is not installed. Use pkill instead.' && command -v pkill >/dev/null || echo 'WARNING: pkill is not installed.'
+
+[2026-06-22 16:07:17] OK (0): echo '--- HOST ENVIRONMENT ---' && uname -a && cat /etc/os-release 2>/dev/null | grep PRETTY_NAME && command -v lsof >/dev/null || echo 'WARNING: lsof is not installed. Use pkill or fuser instead.' && command -v fuser >/dev/null || echo 'WARNING: fuser is not installed. Use pkill instead.' && command -v pkill >/dev/null || echo 'WARNING: pkill is not installed.'
+
+[2026-06-22 16:07:29] OK (0): echo '--- HOST ENVIRONMENT ---' && uname -a && cat /etc/os-release 2>/dev/null | grep PRETTY_NAME && command -v lsof >/dev/null || echo 'WARNING: lsof is not installed. Use pkill or fuser instead.' && command -v fuser >/dev/null || echo 'WARNING: fuser is not installed. Use pkill instead.' && command -v pkill >/dev/null || echo 'WARNING: pkill is not installed.'
+
+[2026-06-22 16:07:45] OK (0): echo '--- HOST ENVIRONMENT ---' && uname -a && cat /etc/os-release 2>/dev/null | grep PRETTY_NAME && command -v lsof >/dev/null || echo 'WARNING: lsof is not installed. Use pkill or fuser instead.' && command -v fuser >/dev/null || echo 'WARNING: fuser is not installed. Use pkill instead.' && command -v pkill >/dev/null || echo 'WARNING: pkill is not installed.'
+
+[2026-06-24 14:50:45] OK (0): echo '--- HOST ENVIRONMENT ---' && uname -a && cat /etc/os-release 2>/dev/null | grep PRETTY_NAME && command -v lsof >/dev/null || echo 'WARNING: lsof is not installed. Use pkill or fuser instead.' && command -v fuser >/dev/null || echo 'WARNING: fuser is not installed. Use pkill instead.' && command -v pkill >/dev/null || echo 'WARNING: pkill is not installed.'
+
+[2026-06-24 14:51:39] OK (0): echo '--- VERSIONS ---' && python3 --version 2>/dev/null && node --version 2>/dev/null && npm --version 2>/dev/null && java -version 2>/dev/null && go version 2>/dev/null; echo '--- END ---'
+
+[2026-06-24 14:51:47] OK (0): npm install -g create-react-app 2>&1 | tail -3
+
+[2026-06-24 14:52:03] OK (0): npm install -g vite 2>&1 | tail -3
+
+[2026-06-24 14:52:04] OK (0): echo 'node:' v20.20.2 '| npm:' 10.8.2 '| python:' Python 3.11.15 '| java:' sh: 1: java: not found '| go:' N/A
+
+[2026-06-24 14:52:47] OK (0): npm install
+
+[2026-06-24 14:53:55] OK (0): echo '--- VERSIONS ---' && python3 --version 2>/dev/null && node --version 2>/dev/null && npm --version 2>/dev/null && java -version 2>/dev/null && go version 2>/dev/null; echo '--- END ---'
+
+[2026-06-24 14:53:56] OK (0): echo 'node:' v20.20.2 '| npm:' 10.8.2 '| python:' Python 3.11.15 '| java:' sh: 1: java: not found '| go:' N/A
+
+[2026-06-24 14:54:24] OK (0): echo '--- VERSIONS ---' && python3 --version 2>/dev/null && node --version 2>/dev/null && npm --version 2>/dev/null && java -version 2>/dev/null && go version 2>/dev/null; echo '--- END ---'
+
+[2026-06-24 14:54:25] OK (0): echo 'node:' v20.20.2 '| npm:' 10.8.2 '| python:' Python 3.11.15 '| java:' sh: 1: java: not found '| go:' N/A
+
+[2026-06-24 14:55:00] OK (0): echo '--- VERSIONS ---' && python3 --version 2>/dev/null && node --version 2>/dev/null && npm --version 2>/dev/null && java -version 2>/dev/null && go version 2>/dev/null; echo '--- END ---'
+
+[2026-06-24 14:55:00] OK (0): echo 'node:' v20.20.2 '| npm:' 10.8.2 '| python:' Python 3.11.15 '| java:' sh: 1: java: not found '| go:' N/A
+
+[2026-06-30 02:23:12] OK (0): echo '--- HOST ENVIRONMENT ---' && uname -a && cat /etc/os-release 2>/dev/null | grep PRETTY_NAME && command -v lsof >/dev/null || echo 'WARNING: lsof is not installed. Use pkill or fuser instead.' && command -v fuser >/dev/null || echo 'WARNING: fuser is not installed. Use pkill instead.' && command -v pkill >/dev/null || echo 'WARNING: pkill is not installed.'
+
+[2026-06-30 02:23:37] OK (0): echo '--- VERSIONS ---' && python3 --version 2>/dev/null && node --version 2>/dev/null && npm --version 2>/dev/null && java -version 2>/dev/null && go version 2>/dev/null; echo '--- END ---'
+
+[2026-06-30 02:23:45] OK (0): npm install -g create-react-app 2>&1 | tail -3
+
+[2026-06-30 02:24:18] OK (0): npm install -g vite 2>&1 | tail -3
+
+[2026-06-30 02:24:19] OK (0): echo 'node:' v20.20.2 '| npm:' 10.8.2 '| python:' Python 3.11.15 '| java:' sh: 1: java: not found '| go:' N/A
+
+[2026-06-30 02:24:25] OK (0): npm install
+
