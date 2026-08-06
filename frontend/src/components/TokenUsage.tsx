@@ -13,25 +13,25 @@ export const TokenUsage: React.FC = () => {
     const isCritical = percent > 90;
 
     const barColor = isCritical
-        ? 'bg-red-500'
+        ? 'bg-rose-500'
         : isWarning
             ? 'bg-amber-500'
             : 'bg-brand';
 
     const textColor = isCritical
-        ? 'text-red-400'
+        ? 'text-rose-400'
         : isWarning
             ? 'text-amber-400'
             : 'text-text-muted';
 
     return (
-        <div className="flex items-center gap-2 text-[10px]">
+        <div className="flex items-center gap-2 text-[11px]">
             {/* Context budget bar */}
             <div className="flex items-center gap-1.5" title={`Context: ${usage.messageTokens.toLocaleString()} / ${usage.budgetTokens.toLocaleString()} tokens (${percent}%)`}>
                 <Brain size={12} className={textColor} />
-                <div className="w-16 h-1.5 rounded-full bg-surface-hover overflow-hidden">
+                <div className="w-14 h-1.5 rounded-full bg-surface-hover overflow-hidden">
                     <div
-                        className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                        className={`h-full rounded-full transition-all duration-300 ${barColor}`}
                         style={{ width: `${percent}%` }}
                     />
                 </div>
@@ -40,12 +40,12 @@ export const TokenUsage: React.FC = () => {
 
             {/* Active modules indicator */}
             {usage.activeModules && usage.activeModules.length > 0 && (
-                <div className="flex items-center gap-1 border-l border-border pl-2">
-                    <Zap size={10} className="text-brand" />
+                <div className="flex items-center gap-1 border-l border-border/40 pl-2">
+                    <Zap size={10} className="text-brand opacity-80" />
                     {usage.activeModules.map((mod) => (
                         <span
                             key={mod}
-                            className="px-1 py-0.5 rounded bg-brand/10 text-brand text-[9px] uppercase tracking-wider"
+                            className="px-1 py-0.2 rounded bg-surface border border-border/40 text-text-muted text-[9px] font-mono"
                             title={getModuleDescription(mod)}
                         >
                             {mod}

@@ -15,7 +15,6 @@ import {
     X,
     Cpu,
     Clock,
-    AlertTriangle,
     AlertCircle,
     ListCollapse
 } from 'lucide-react';
@@ -37,11 +36,11 @@ const AgentTerminal: React.FC<{ xtermRef: React.MutableRefObject<XTerm | null> }
 
         const term = new XTerm({
             theme: {
-                background: '#0f1115',
-                foreground: '#e2e8f0',
+                background: '#FAFAFA',
+                foreground: '#09090B',
                 cursor: 'transparent',
-                cursorAccent: '#0f1115',
-                selectionBackground: '#f59e0b33',
+                cursorAccent: '#FAFAFA',
+                selectionBackground: '#F47A2033',
             },
             fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
             fontSize: 12,
@@ -136,14 +135,14 @@ const AppLogsTerminal: React.FC<{ xtermRef: React.MutableRefObject<XTerm | null>
 
         const term = new XTerm({
             theme: {
-                background: '#0a0c10',
-                foreground: '#a8b5c8',
+                background: '#FAFAFA',
+                foreground: '#09090B',
                 cursor: 'transparent',
-                selectionBackground: '#3b82f633',
-                green: '#4ade80',
-                red: '#f87171',
-                yellow: '#fbbf24',
-                cyan: '#22d3ee',
+                selectionBackground: '#F47A2033',
+                green: '#16a34a',
+                red: '#dc2626',
+                yellow: '#d97706',
+                cyan: '#0891b2',
             },
             fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
             fontSize: 11,
@@ -234,11 +233,11 @@ const UserTerminal: React.FC = () => {
 
         const term = new XTerm({
             theme: {
-                background: '#0f1115',
-                foreground: '#e2e8f0',
-                cursor: '#10b981',
-                cursorAccent: '#0f1115',
-                selectionBackground: '#10b98133',
+                background: '#FAFAFA',
+                foreground: '#09090B',
+                cursor: '#F47A20',
+                cursorAccent: '#FAFAFA',
+                selectionBackground: '#F47A2033',
             },
             fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
             fontSize: 12,
@@ -811,31 +810,31 @@ export const TerminalLog: React.FC = () => {
     const currentTab = tabs.find(t => t.id === activeTab);
 
     return (
-        <div className="h-full w-full bg-[#0f1115] flex flex-col relative overflow-hidden text-gray-200">
+        <div className="h-full w-full bg-background flex flex-col relative overflow-hidden text-text">
             
             {/* 1. AGENT TASK CONTROL DASHBOARD */}
-            <div className="border-b border-[#1e293b] bg-[#0c0d12] px-4 py-2 shrink-0 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Agent State:</span>
+            <div className="border-b border-border bg-surface px-3 py-2 shrink-0 flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-text-muted">Agent status:</span>
                     <div className="flex items-center gap-1">
                         {['planning', 'reading', 'writing', 'testing', 'validating', 'paused', 'idle'].map((state) => {
                             const isActive = agentTaskStatus === state;
                             const colors: Record<string, string> = {
-                                planning: 'bg-blue-500 text-blue-100 border-blue-400/30',
-                                reading: 'bg-indigo-500 text-indigo-100 border-indigo-400/30',
-                                writing: 'bg-teal-500 text-teal-100 border-teal-400/30',
-                                testing: 'bg-purple-500 text-purple-100 border-purple-400/30',
-                                validating: 'bg-emerald-500 text-emerald-100 border-emerald-400/30',
-                                paused: 'bg-amber-500 text-black border-amber-400/30',
-                                idle: 'bg-gray-700 text-gray-300 border-gray-600/30'
+                                planning: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+                                reading: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20',
+                                writing: 'bg-teal-500/10 text-teal-600 border-teal-500/20',
+                                testing: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
+                                validating: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+                                paused: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+                                idle: 'bg-surface-hover text-text-muted border-border'
                             };
                             return (
                                 <span
                                     key={state}
-                                    className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded border transition-all duration-300 ${
+                                    className={`px-2 py-0.5 text-[10px] font-medium rounded-md border transition-colors ${
                                         isActive
-                                            ? `${colors[state]} shadow-md scale-105 opacity-100`
-                                            : 'bg-transparent text-gray-600 border-transparent opacity-40 hover:opacity-60'
+                                            ? `${colors[state]} font-semibold`
+                                            : 'bg-transparent text-text-muted/50 border-transparent'
                                     }`}
                                 >
                                     {state}
@@ -850,7 +849,7 @@ export const TerminalLog: React.FC = () => {
                     {agentTaskStatus !== 'idle' && agentTaskStatus !== 'paused' && (
                         <button
                             onClick={pauseAgent}
-                            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-amber-500/10 hover:bg-amber-500/25 border border-amber-500/35 text-amber-400 transition-colors"
+                            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-600 transition-colors"
                             title="Pause Agent Graph Loop"
                         >
                             <Pause size={12} />
@@ -860,7 +859,7 @@ export const TerminalLog: React.FC = () => {
                     {agentTaskStatus === 'paused' && (
                         <button
                             onClick={resumeAgent}
-                            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-400 transition-colors animate-pulse"
+                            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-600 transition-colors animate-pulse"
                             title="Resume Agent Graph Loop"
                         >
                             <Play size={12} />
@@ -870,7 +869,7 @@ export const TerminalLog: React.FC = () => {
                     {agentTaskStatus !== 'idle' && (
                         <button
                             onClick={triggerCancelTask}
-                            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-red-500/10 hover:bg-red-500/25 border border-red-500/35 text-red-400 transition-colors"
+                            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-600 transition-colors"
                             title="Cancel Agent Task Loop"
                         >
                             <Square size={12} />
@@ -882,27 +881,27 @@ export const TerminalLog: React.FC = () => {
 
             {/* 2. ACTIVE PROCESS CONTROL HEADER */}
             {(activeCommand || foregroundProcess) && (
-                <div className="border-b border-[#1e293b] bg-[#13161c] px-4 py-2 shrink-0 flex items-center justify-between gap-4 transition-all duration-200">
+                <div className="border-b border-border bg-surface px-4 py-2 shrink-0 flex items-center justify-between gap-4 transition-all duration-200">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 shrink-0">
                             <span className="relative flex h-2 w-2">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                             </span>
-                            <span className="text-xs font-bold text-emerald-400">COMMAND RUNNING</span>
+                            <span className="text-xs font-bold text-emerald-600">COMMAND RUNNING</span>
                         </div>
-                        <div className="flex items-center gap-1 text-[11px] font-mono bg-[#07080a] border border-[#1e293b] rounded px-2 py-0.5 text-gray-300 truncate max-w-md" title={activeCommand || foregroundProcess?.command}>
-                            <span className="text-gray-500 shrink-0">$</span>
+                        <div className="flex items-center gap-1 text-[11px] font-mono bg-background border border-border rounded-md px-2.5 py-0.5 text-text truncate max-w-md" title={activeCommand || foregroundProcess?.command}>
+                            <span className="text-text-muted shrink-0">$</span>
                             <span className="truncate">{activeCommand || foregroundProcess?.command}</span>
                         </div>
                         
                         <div className="flex items-center gap-3 shrink-0">
-                            <div className="flex items-center gap-1 text-[10px] text-gray-400 font-mono">
-                                <Cpu size={12} className="text-gray-500" />
+                            <div className="flex items-center gap-1 text-[10px] text-text-muted font-mono">
+                                <Cpu size={12} className="text-text-muted" />
                                 <span>PID: {activeCommandPid || foregroundProcess?.pid || 'unknown'}</span>
                             </div>
-                            <div className="flex items-center gap-1 text-[10px] text-gray-400 font-mono">
-                                <Clock size={12} className="text-gray-500" />
+                            <div className="flex items-center gap-1 text-[10px] text-text-muted font-mono">
+                                <Clock size={12} className="text-text-muted" />
                                 <span>{runtimeDuration}s</span>
                             </div>
                         </div>
@@ -922,7 +921,7 @@ export const TerminalLog: React.FC = () => {
                                     appendInteractiveOutput(`\r\n\x1b[33mStop button clicked. Sending Ctrl+C to terminal...\x1b[0m\r\n`, activeSessionId);
                                 }
                             }}
-                            className="px-2.5 py-1 text-xs font-bold rounded bg-amber-500 text-black hover:bg-amber-400 transition-colors"
+                            className="px-2.5 py-1 text-xs font-bold rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors shadow-xs"
                             title="Stop current process (SIGINT / Ctrl+C)"
                         >
                             Stop
@@ -932,14 +931,14 @@ export const TerminalLog: React.FC = () => {
                                 const pid = activeCommandPid || foregroundProcess?.pid;
                                 triggerForceKill(pid || null);
                             }}
-                            className="px-2.5 py-1 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-500 transition-colors"
+                            className="px-2.5 py-1 text-xs font-bold rounded-lg bg-rose-600 text-white hover:bg-rose-500 transition-colors shadow-xs"
                             title="Force terminate process (SIGKILL / 9)"
                         >
                             Force Kill
                         </button>
                         <button
                             onClick={restartCommand}
-                            className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                            className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-brand text-white hover:bg-brand-hover transition-colors shadow-xs"
                             title="Restart running process"
                         >
                             <RefreshCw size={12} />
@@ -953,7 +952,7 @@ export const TerminalLog: React.FC = () => {
                                     clearAppLogs(activeSessionId);
                                 }
                             }}
-                            className="px-2.5 py-1 text-xs font-bold rounded bg-gray-700 text-gray-200 hover:bg-gray-600 transition-colors"
+                            className="px-2.5 py-1 text-xs font-bold rounded-lg border border-border bg-surface text-text hover:bg-surface-hover transition-colors"
                             title="Clear active terminal output"
                         >
                             Clear
@@ -963,16 +962,16 @@ export const TerminalLog: React.FC = () => {
             )}
 
             {/* Tab Header */}
-            <div className="flex items-center justify-between border-b border-[#1e293b] px-4 py-1.5 shrink-0 bg-[#07080a]">
-                <div className="flex gap-2">
+            <div className="flex items-center justify-between border-b border-border px-4 py-2 shrink-0 bg-surface">
+                <div className="flex gap-1.5">
                     {tabs.map((tab) => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold transition-all relative border ${
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all relative border ${
                                 activeTab === tab.id
-                                    ? 'bg-[#1e293b] text-brand border-brand/20'
-                                    : 'text-gray-400 hover:text-gray-200 border-transparent'
+                                    ? 'bg-brand-muted text-brand border-brand/30 font-semibold'
+                                    : 'text-text-muted hover:text-text hover:bg-surface-hover border-transparent'
                             }`}
                         >
                             {tab.icon}
@@ -988,17 +987,17 @@ export const TerminalLog: React.FC = () => {
                 </div>
                 
                 <div className="flex items-center gap-4">
-                    <div className={`text-[10px] uppercase tracking-wider ${isWaiting && activeTab === 'agent' ? 'text-amber-400' : 'text-gray-500'}`}>
+                    <div className={`text-[10px] uppercase tracking-wider font-semibold ${isWaiting && activeTab === 'agent' ? 'text-amber-600' : 'text-text-muted'}`}>
                         {currentTab?.sublabel}
                     </div>
 
                     {/* Active Processes list toggle */}
                     <button
                         onClick={() => setProcessesPanelOpen(prev => !prev)}
-                        className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
                             processesPanelOpen
-                                ? 'bg-teal-500/10 border-teal-500/30 text-teal-400'
-                                : 'bg-[#0f1115] border-[#1e293b] text-gray-400 hover:text-gray-200'
+                                ? 'bg-brand-muted border-brand/30 text-brand font-semibold'
+                                : 'bg-surface border-border text-text-muted hover:text-text hover:bg-surface-hover'
                         }`}
                         title="Show container sandbox active processes"
                     >
@@ -1017,17 +1016,17 @@ export const TerminalLog: React.FC = () => {
                 {/* Main Terminals Grid */}
                 <div className="flex-1 min-h-0 relative">
                     <div className={`absolute inset-0 p-2 transition-opacity duration-200 flex flex-col ${activeTab === 'agent' ? 'z-10 opacity-100' : 'z-0 opacity-0 pointer-events-none'}`}>
-                        <div className="flex-1 min-h-0 bg-[#0f1115] rounded border border-[#1e293b] p-1">
+                        <div className="flex-1 min-h-0 bg-surface rounded-xl border border-border p-1 shadow-xs">
                             <AgentTerminal xtermRef={agentTermRef} />
                         </div>
                     </div>
                     <div className={`absolute inset-0 p-2 transition-opacity duration-200 flex flex-col ${activeTab === 'app-logs' ? 'z-10 opacity-100' : 'z-0 opacity-0 pointer-events-none'}`}>
-                        <div className="flex-1 min-h-0 bg-[#0a0c10] rounded border border-[#1e293b]/70 p-1">
+                        <div className="flex-1 min-h-0 bg-surface rounded-xl border border-border p-1 shadow-xs">
                             <AppLogsTerminal xtermRef={appLogsTermRef} />
                         </div>
                     </div>
                     <div className={`absolute inset-0 p-2 transition-opacity duration-200 ${activeTab === 'user-terminal' ? 'z-10 opacity-100' : 'z-0 opacity-0 pointer-events-none'}`}>
-                        <div className="h-full w-full bg-[#0f1115] rounded border border-[#1e293b] p-1">
+                        <div className="h-full w-full bg-surface rounded-xl border border-border p-1 shadow-xs">
                             <UserTerminal />
                         </div>
                     </div>
@@ -1035,8 +1034,8 @@ export const TerminalLog: React.FC = () => {
 
                 {/* COLLAPSIBLE SANDBOX PROCESSES PANEL */}
                 {processesPanelOpen && (
-                    <div className="w-80 border-l border-[#1e293b] bg-[#0c0d12] flex flex-col shrink-0 transition-all duration-300">
-                        <div className="px-4 py-2.5 border-b border-[#1e293b] flex items-center justify-between bg-[#07080a]">
+                    <div className="w-80 border-l border-border bg-surface flex flex-col shrink-0 transition-all duration-300">
+                        <div className="px-4 py-2.5 border-b border-border flex items-center justify-between bg-surface-hover">
                             <span className="text-xs font-bold text-gray-400 flex items-center gap-1.5">
                                 <Cpu size={14} className="text-teal-400" />
                                 <span>Sandbox Process Panel</span>
@@ -1115,12 +1114,12 @@ export const TerminalLog: React.FC = () => {
 
             {/* 3. ADVANCED STDIN TEXTAREA BOX (Always visible under Agent Terminal tab) */}
             {activeTab === 'agent' && (
-                <div className="px-4 pb-4 pt-1 shrink-0 border-t border-[#1e293b]/70 bg-[#07080a] relative">
+                <div className="px-4 pb-4 pt-2 shrink-0 border-t border-border bg-surface relative">
                     
                     {/* Command suggestions overlay */}
                     {suggestions.length > 0 && (
-                        <div className="absolute bottom-full left-4 right-4 bg-[#0d0e12] border border-[#1e293b] rounded-t-md shadow-2xl p-1 z-50 mb-1">
-                            <div className="text-[9px] uppercase font-bold text-gray-500 px-2 py-0.5 border-b border-[#1e293b] mb-1 flex justify-between">
+                        <div className="absolute bottom-full left-4 right-4 bg-surface border border-border rounded-t-xl shadow-xl p-1.5 z-50 mb-1">
+                            <div className="text-[9px] uppercase font-bold text-text-muted px-2 py-1 border-b border-border mb-1 flex justify-between">
                                 <span>Suggestions (Tab to accept, ↑/↓ to navigate)</span>
                                 <span>{suggestions.length} matches</span>
                             </div>
@@ -1132,14 +1131,14 @@ export const TerminalLog: React.FC = () => {
                                             setInputValue(sug);
                                             setSuggestions([]);
                                         }}
-                                        className={`w-full text-left px-2 py-1 text-xs font-mono rounded transition-colors flex items-center justify-between ${
+                                        className={`w-full text-left px-2.5 py-1 text-xs font-mono rounded-lg transition-colors flex items-center justify-between ${
                                             idx === activeSuggestionIdx
-                                                ? 'bg-[#1e293b] text-brand font-bold'
-                                                : 'text-gray-400 hover:bg-[#151922] hover:text-gray-200'
+                                                ? 'bg-brand-muted text-brand font-bold'
+                                                : 'text-text-muted hover:bg-surface-hover hover:text-text'
                                         }`}
                                     >
                                         <span>{sug}</span>
-                                        <span className="text-[9px] text-gray-600 font-sans">autocomplete</span>
+                                        <span className="text-[9px] text-text-muted font-sans">autocomplete</span>
                                     </button>
                                 ))}
                             </div>
@@ -1147,16 +1146,16 @@ export const TerminalLog: React.FC = () => {
                     )}
 
                     <div className="flex gap-2 items-end">
-                        <div className={`flex-1 flex flex-col rounded-lg border bg-[#0d0e12] px-3 py-1.5 transition-all duration-300 focus-within:ring-1 focus-within:ring-brand/50 ${
+                        <div className={`flex-1 flex flex-col rounded-xl border bg-background px-3 py-1.5 transition-all duration-300 focus-within:ring-1 focus-within:ring-brand/50 ${
                             isWaiting 
                                 ? 'border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.15)] focus-within:border-amber-400' 
-                                : 'border-[#1e293b] focus-within:border-brand/60'
+                                : 'border-border focus-within:border-brand/60'
                         }`}>
                             <div className="flex items-center justify-between mb-1 shrink-0 select-none">
-                                <span className={`text-[9px] font-bold uppercase tracking-wider ${isWaiting ? 'text-amber-400 animate-pulse' : 'text-gray-500'}`}>
+                                <span className={`text-[9px] font-bold uppercase tracking-wider ${isWaiting ? 'text-amber-600 animate-pulse' : 'text-text-muted'}`}>
                                     {isWaiting ? '● COMMAND WAITING FOR INPUT' : '● agent standard input'}
                                 </span>
-                                <span className="text-[8px] text-gray-600 font-mono">
+                                <span className="text-[8px] text-text-muted font-mono">
                                     Ctrl+L (clear) · Ctrl+C (stop) · Ctrl+Shift+C (copy)
                                 </span>
                             </div>
@@ -1168,7 +1167,7 @@ export const TerminalLog: React.FC = () => {
                                 onChange={(e) => setInputValue(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 placeholder={isWaiting ? "Type response here..." : "⌨ Type command or input to running terminal..."}
-                                className="w-full bg-transparent resize-none overflow-y-auto text-xs text-gray-200 font-mono focus:outline-none py-1 min-h-[24px] max-h-[120px] leading-relaxed"
+                                className="w-full bg-transparent resize-none overflow-y-auto text-xs text-text font-mono focus:outline-none py-1 min-h-[24px] max-h-[120px] leading-relaxed placeholder:text-text-muted/50"
                             />
                         </div>
 
@@ -1176,7 +1175,7 @@ export const TerminalLog: React.FC = () => {
                             {inputValue.trim() && (
                                 <button
                                     onClick={() => setInputValue('')}
-                                    className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300 self-end transition-colors"
+                                    className="p-1 rounded-lg hover:bg-surface-hover text-text-muted hover:text-text self-end transition-colors"
                                     title="Clear input"
                                 >
                                     <X size={14} />
@@ -1184,10 +1183,10 @@ export const TerminalLog: React.FC = () => {
                             )}
                             <button
                                 onClick={() => submitStdin(inputValue)}
-                                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-md shrink-0 ${
+                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 ${
                                     isWaiting
-                                        ? 'bg-amber-500 text-black hover:bg-amber-400'
-                                        : 'bg-brand text-black hover:bg-brand-hover'
+                                        ? 'bg-amber-500 text-white hover:bg-amber-600'
+                                        : 'bg-brand text-white hover:bg-brand-hover'
                                 }`}
                             >
                                 Send

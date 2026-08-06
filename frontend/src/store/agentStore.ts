@@ -161,7 +161,7 @@ interface AgentStore {
     setActiveCommandStart: (start: number | null, sessionId?: string) => void;
     setActiveCommandPid: (pid: number | null, sessionId?: string) => void;
     setAgentTaskStatus: (status: 'idle' | 'planning' | 'reading' | 'writing' | 'testing' | 'validating' | 'paused', sessionId?: string) => void;
-    killProcess: (pid: number, signal?: number) => void;
+    killProcess: (pid: number | null, signal?: number) => void;
     restartCommand: () => void;
     pauseAgent: () => void;
     resumeAgent: () => void;

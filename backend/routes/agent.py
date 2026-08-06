@@ -329,10 +329,24 @@ async def websocket_endpoint(ws: WebSocket):
         # Get LLM profile
         settings_service = SettingsService()
         profile = None
-        if profile_id:
-            profile = settings_service.get_profile(profile_id)
-        if profile is None:
-            profile = settings_service.get_default_profile()
+        try:
+            if profile_id:
+                profile = settings_service.get_profile(profile_id)
+            if profile is None:
+                profile = settings_service.get_default_profile()
+        except Exception as exc:
+            logger.warning("settings_service_failed", error=str(exc))
+            from models.llm_profile import LLMProfile
+            profile = LLMProfile(
+                id=str(uuid.uuid4()),
+                provider="openai",
+                model="gpt-4o",
+                temperature=0.2,
+                max_tokens=2048,
+                is_default=True,
+                created_at=None,
+                updated_at=None
+            )
 
         logger.info("ws_session_start", session_id=session_id, action=action, chat_mode=chat_mode, num_locked=len(locked_files))
 
