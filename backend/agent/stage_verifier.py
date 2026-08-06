@@ -3,12 +3,13 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional
 from agent.stage_checkpoint import StageCheckpoint, VerificationResult
 from agent.verification_rules import VerificationRuleEngine, Rule, RuleResult
+from agent.state import AgentState
 
 class StageVerifier:
     def __init__(self, rule_engine: Optional[VerificationRuleEngine] = None):
         self.rule_engine = rule_engine or VerificationRuleEngine()
 
-    def verify(self, stage_name: str, state: Dict[str, Any]) -> VerificationResult:
+    def verify(self, stage_name: str, state: AgentState) -> VerificationResult:
         """
         Executes all registered verification rules for a given stage against the agent state,
         updates the stage checkpoint, logs history, and returns the aggregated verification result.

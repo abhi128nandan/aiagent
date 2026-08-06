@@ -306,6 +306,7 @@ export function useAgentStream() {
             logAgentEvent(`> ❌ Error: ${errorMsg}`, sessionId);
             store.addMessage({ role: 'agent', content: `❌ **Error**: ${errorMsg}` }, sessionId);
             store.setStatus('error');
+            store.setAgentTaskStatus('idle', sessionId);
             return;
         }
 
@@ -341,6 +342,9 @@ export function useAgentStream() {
 
             if (output?.status) {
                 store.setStatus(output.status);
+                if (output.status === 'done' || output.status === 'error') {
+                    store.setAgentTaskStatus('idle', sessionId);
+                }
             }
 
             // Extract token usage from implement node output

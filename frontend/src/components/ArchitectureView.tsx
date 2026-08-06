@@ -1,119 +1,121 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { RefreshCw, LayoutGrid, Layers, CheckCircle, Activity, Network, FileText, Calendar, ChevronRight, GitBranch, Server, GitCommit, HelpCircle, AlertCircle } from 'lucide-react';
 import { useAgentStore } from '../store/agentStore';
-import mermaid from 'mermaid';
-import { 
-    LayoutGrid, 
-    FileText, 
-    Layers, 
-    Network, 
-    GitCommit, 
-    GitBranch, 
-    Server, 
-    Activity,
-    AlertCircle, 
-    CheckCircle,
-    HelpCircle,
-    Calendar,
-    ChevronRight,
-    RefreshCw
-} from 'lucide-react';
+import { ReactFlow, Background, Controls, type Node, type Edge, Position } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import dagre from 'dagre';
 
-// Initialize mermaid for dark-mode layout
-mermaid.initialize({
-    startOnLoad: false,
-    theme: 'dark',
-    securityLevel: 'loose',
-    themeVariables: {
-        background: '#181920',
-        primaryColor: '#4f46e5',
-        primaryTextColor: '#f8fafc',
-        lineColor: '#64748b',
-        secondaryColor: '#312e81',
-        tertiaryColor: '#1e1b4b',
-    }
-});
+const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'TB') => {
+  // Create a fresh graph instance per layout call to prevent state leakage
+  // between different diagram renders (Bug #11 fix)
+  const dagreGraph = new dagre.graphlib.Graph();
+  dagreGraph.setDefaultEdgeLabel(() => ({}));
 
-interface MermaidRendererProps {
-    chart: string;
+  const isHorizontal = direction === 'LR';
+  dagreGraph.setGraph({ rankdir: direction });
+
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { width: 150, height: 50 });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  const newNodes = nodes.map((node) => {
+    const nodeWithPosition = dagreGraph.node(node.id);
+    const newNode = {
+      ...node,
+      targetPosition: isHorizontal ? Position.Left : Position.Top,
+      sourcePosition: isHorizontal ? Position.Right : Position.Bottom,
+      position: {
+        x: nodeWithPosition.x - 150 / 2,
+        y: nodeWithPosition.y - 50 / 2,
+      },
+    };
+    return newNode;
+  });
+
+  return { nodes: newNodes, edges };
+};
+
+interface FlowRendererProps {
+  chartData: any; // { nodes: any[], edges: any[] }
+  direction?: 'TB' | 'LR';
 }
 
-export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [svg, setSvg] = useState<string>('');
-    const [error, setError] = useState<string | null>(null);
+export const FlowRenderer: React.FC<FlowRendererProps> = ({ chartData, direction = 'TB' }) => {
+  const [nodes, setNodes] = useState<Node[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
 
-    useEffect(() => {
-        if (!chart) return;
-        
-        setError(null);
-        setSvg('');
-        
-        // Remove any markdown code block wrappers if present
-        let cleanChart = chart.replace(/```mermaid/gi, '').replace(/```/g, '').trim();
-        
-        // Sanitize node labels in square brackets to prevent parsing errors from unescaped quotes.
-        // F[Frontend "React App"] -> F["Frontend 'React App'"]
-        cleanChart = cleanChart.replace(/\[([^\]]+)\]/g, (_match, inner) => {
-            let text = inner.trim();
-            if (text.startsWith('"') && text.endsWith('"')) {
-                let core = text.substring(1, text.length - 1);
-                core = core.replace(/"/g, "'");
-                return `["${core}"]`;
-            } else if (text.startsWith("'") && text.endsWith("'")) {
-                let core = text.substring(1, text.length - 1);
-                core = core.replace(/"/g, "'");
-                return `["${core}"]`;
-            } else {
-                let core = text.replace(/"/g, "'");
-                return `["${core}"]`;
-            }
-        });
-        const id = `mermaid-${Math.floor(Math.random() * 100000)}`;
-        
-        const renderDiagram = async () => {
-            try {
-                const { svg: renderedSvg } = await mermaid.render(id, cleanChart);
-                setSvg(renderedSvg);
-            } catch (err: any) {
-                console.error("Mermaid rendering failed:", err);
-                setError(err?.message || "Failed to render Mermaid diagram. Please verify syntax.");
-            }
-        };
+  useEffect(() => {
+    if (chartData && chartData.nodes && chartData.edges) {
+      const initialNodes: Node[] = chartData.nodes.map((n: any) => ({
+        id: n.id,
+        data: { label: n.data?.label || n.id },
+        position: { x: 0, y: 0 },
+        type: 'default',
+        style: { 
+            background: '#1e1b4b', 
+            color: '#f8fafc', 
+            border: '1px solid #4f46e5',
+            borderRadius: '8px',
+            padding: '10px',
+            fontSize: '12px',
+            width: 150,
+            textAlign: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+        }
+      }));
 
-        renderDiagram();
-    }, [chart]);
+      const initialEdges: Edge[] = chartData.edges.map((e: any) => ({
+        id: e.id || `e-${e.source}-${e.target}`,
+        source: e.source,
+        target: e.target,
+        animated: true,
+        style: { stroke: '#64748b' }
+      }));
 
-    if (error) {
-        return (
-            <div className="p-4 rounded-xl bg-red-950/20 border border-red-500/30 text-red-400 text-xs font-mono whitespace-pre-wrap max-h-[400px] overflow-auto">
-                <div className="flex items-center gap-2 font-semibold mb-2 text-sm">
-                    <AlertCircle size={16} />
-                    <span>Mermaid Rendering Error</span>
-                </div>
-                <p className="mb-3 text-red-300">{error}</p>
-                <div className="p-3 bg-black/40 rounded border border-slate-800 text-[10px] text-slate-400 overflow-x-auto">
-                    {chart}
-                </div>
-            </div>
-        );
+      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+        initialNodes,
+        initialEdges,
+        direction
+      );
+
+      setNodes(layoutedNodes);
+      setEdges(layoutedEdges);
     }
+  }, [chartData, direction]);
 
+  if (!chartData || !chartData.nodes || chartData.nodes.length === 0) {
     return (
-        <div className="flex justify-center items-center overflow-auto p-6 bg-[#13141c]/50 border border-slate-800/80 rounded-2xl min-h-[450px] transition-all hover:border-slate-700/80">
-            {svg ? (
-                <div 
-                    ref={containerRef} 
-                    className="mermaid-svg-container max-w-full scale-105 transform origin-center"
-                    dangerouslySetInnerHTML={{ __html: svg }} 
-                />
-            ) : (
-                <div className="flex items-center gap-3 text-slate-400 text-sm">
-                    <RefreshCw className="animate-spin text-brand" size={18} />
-                    <span>Rendering system blueprint...</span>
-                </div>
-            )}
+        <div className="flex items-center gap-3 text-slate-400 text-sm h-full justify-center">
+            <RefreshCw className="animate-spin text-brand" size={18} />
+            <span>Rendering system blueprint...</span>
         </div>
     );
+  }
+
+  return (
+    <div className="flex justify-center items-center p-2 bg-[#13141c]/50 border border-slate-800/80 rounded-2xl min-h-[450px] transition-all hover:border-slate-700/80 h-full w-full">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          fitView
+          colorMode="dark"
+          proOptions={{ hideAttribution: true }}
+          minZoom={0.2}
+          maxZoom={1.5}
+        >
+          <Background color="#334155" gap={16} />
+          <Controls />
+        </ReactFlow>
+    </div>
+  );
 };
 
 export const ArchitectureView: React.FC = () => {
@@ -144,7 +146,7 @@ export const ArchitectureView: React.FC = () => {
             <div className="flex-1 flex flex-col items-center justify-center bg-[#13141c] text-slate-300 p-8">
                 <RefreshCw className="animate-spin text-brand mb-4" size={36} />
                 <h3 className="font-semibold text-lg">Loading Architecture Spec</h3>
-                <p className="text-sm text-slate-500 mt-1">Retrieving Mermaid files and ADR models...</p>
+                <p className="text-sm text-slate-500 mt-1">Retrieving system artifacts and ADR models...</p>
             </div>
         );
     }
@@ -173,16 +175,19 @@ export const ArchitectureView: React.FC = () => {
     const artifacts = plan.architectural_artifacts || {};
     const decisions = plan.architecture_decisions || [];
 
-    // Get current diagram body
-    let currentDiagramContent = '';
-    if (activeDiagram === 'system') currentDiagramContent = artifacts.system_diagram;
-    else if (activeDiagram === 'component') currentDiagramContent = artifacts.component_diagram;
-    else if (activeDiagram === 'flow') currentDiagramContent = artifacts.data_flow_diagram;
-    else if (activeDiagram === 'deployment') currentDiagramContent = artifacts.deployment_diagram;
+    // Get current diagram body (with null-safety fallback)
+    const emptyGraph = { nodes: [], edges: [] };
+    let currentDiagramContent: any = emptyGraph;
+    if (activeDiagram === 'system') currentDiagramContent = artifacts.system_diagram || emptyGraph;
+    else if (activeDiagram === 'component') currentDiagramContent = artifacts.component_diagram || emptyGraph;
+    else if (activeDiagram === 'flow') currentDiagramContent = artifacts.data_flow_diagram || emptyGraph;
+    else if (activeDiagram === 'deployment') currentDiagramContent = artifacts.deployment_diagram || emptyGraph;
     else if (activeDiagram.startsWith('sequence-')) {
         const idx = parseInt(activeDiagram.split('-')[1]);
-        currentDiagramContent = artifacts.sequence_diagrams?.[idx] || '';
+        currentDiagramContent = artifacts.sequence_diagrams?.[idx] || emptyGraph;
     }
+
+    const flowDirection = (activeDiagram === 'data_flow' || activeDiagram === 'component') ? 'LR' : 'TB';
 
     // Default to first ADR if none is active
     const selectedAdr = decisions.find((d: any) => d.id === activeAdrId) || decisions[0];
@@ -387,7 +392,7 @@ export const ArchitectureView: React.FC = () => {
                                     {activeDiagram.startsWith('sequence-') && `Interaction Sequence #${parseInt(activeDiagram.split('-')[1]) + 1}`}
                                 </h3>
                                 
-                                <MermaidRenderer chart={currentDiagramContent} />
+                                <FlowRenderer chartData={currentDiagramContent} direction={flowDirection} />
                             </div>
                         </div>
                     </div>

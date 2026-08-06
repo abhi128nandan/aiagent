@@ -47,12 +47,18 @@ def _estimate_tokens(messages: List[BaseMessage]) -> int:
     return max(total_chars // 4, 1)
 
 
+class RateLimitExhaustedError(RuntimeError):
+    """Raised when all Groq API keys are exhausted and the total wait budget is exceeded."""
+    pass
+
+
 class RateLimitedGroqLLM(BaseChatModel):
     """
     A LangChain-compatible chat model that wraps Groq calls with:
       - Automatic key rotation from GroqKeyPool
       - Retry on 429 with exponential backoff
       - Token usage tracking
+      - Hard ceiling on total wait time (max_total_wait) to prevent infinite hangs
 
     Usage:
         from agent.rate_limited_llm import RateLimitedGroqLLM
@@ -68,7 +74,8 @@ class RateLimitedGroqLLM(BaseChatModel):
     max_tokens: Optional[int] = None
     max_retries: int = 10  # Total retries across all keys
     base_delay: float = 2.0  # Initial backoff delay in seconds
-    max_delay: float = 120.0  # Maximum backoff delay
+    max_delay: float = 30.0  # Maximum per-retry backoff delay (reduced from 120s)
+    max_total_wait: float = 120.0  # Hard ceiling: total seconds before giving up
 
     class Config:
         arbitrary_types_allowed = True
@@ -135,23 +142,46 @@ class RateLimitedGroqLLM(BaseChatModel):
         Async generation with automatic key rotation and retry logic.
 
         Flow:
-          1. Acquire a key from the pool
+          1. Acquire a key from the pool (with total wait budget)
           2. Try the request
           3a. On success → release key with token count → return
           3b. On 429 → report to pool → acquire next key → retry
           3c. On other error → report → retry with backoff
+          4. If total time exceeds max_total_wait → raise RateLimitExhaustedError
+             so the LLM fallback chain can try an alternative provider
         """
+        import time
         from agent.groq_key_pool import get_groq_pool
 
         pool = get_groq_pool()
         estimated_input_tokens = _estimate_tokens(messages)
         last_error: Optional[Exception] = None
+        start_time = time.monotonic()
 
         for attempt in range(self.max_retries):
+            # ── Hard ceiling: abort if we've waited too long ────────────
+            elapsed = time.monotonic() - start_time
+            if elapsed >= self.max_total_wait:
+                logger.error(
+                    "groq_total_wait_exceeded",
+                    elapsed=round(elapsed, 1),
+                    max_total_wait=self.max_total_wait,
+                    model=self.model,
+                )
+                raise RateLimitExhaustedError(
+                    f"Groq rate limit: total wait time ({elapsed:.0f}s) exceeded "
+                    f"budget ({self.max_total_wait:.0f}s) after {attempt} attempts. "
+                    f"Last error: {last_error}"
+                )
+
             current_key: Optional[str] = None
             try:
-                # 1. Acquire a key
-                current_key = await pool.acquire(model=self.model)
+                # 1. Acquire a key (with remaining wait budget)
+                remaining_wait = max(1.0, self.max_total_wait - elapsed)
+                current_key = await pool.acquire(
+                    model=self.model,
+                    max_wait=min(remaining_wait, 60.0),
+                )
 
                 # 2. Create the LLM with this key
                 inner_llm = self._create_inner_llm(current_key)
@@ -177,6 +207,11 @@ class RateLimitedGroqLLM(BaseChatModel):
                     generations=[ChatGeneration(message=AIMessage(content=response.text))]
                 )
 
+            except (TimeoutError, RateLimitExhaustedError):
+                # Pool.acquire timed out — all keys exhausted within budget
+                # Re-raise so the fallback chain picks up
+                raise
+
             except Exception as e:
                 last_error = e
                 error_str = str(e).lower()
@@ -191,6 +226,7 @@ class RateLimitedGroqLLM(BaseChatModel):
                         "too many requests",
                         "ratelimit",
                         "quota",
+                        "resource_exhausted",
                     ]
                 )
 
@@ -203,6 +239,7 @@ class RateLimitedGroqLLM(BaseChatModel):
                         key_suffix=f"...{current_key[-4:]}",
                         retry_after=retry_after,
                         remaining_keys=pool.size - 1,
+                        elapsed_total=round(time.monotonic() - start_time, 1),
                     )
                     # Small delay before trying next key
                     await asyncio.sleep(min(1.0, retry_after / 10))
@@ -216,22 +253,29 @@ class RateLimitedGroqLLM(BaseChatModel):
                     self.base_delay * (2 ** attempt) + random.uniform(0, 1),
                     self.max_delay,
                 )
+                # Clamp delay to remaining budget
+                remaining = self.max_total_wait - (time.monotonic() - start_time)
+                delay = min(delay, max(remaining, 0))
+
                 logger.error(
                     "groq_request_error",
                     attempt=attempt + 1,
                     error=str(e)[:200],
                     backoff_seconds=round(delay, 1),
                 )
-                await asyncio.sleep(delay)
+                if delay > 0:
+                    await asyncio.sleep(delay)
 
         # All retries exhausted
         pool_stats = pool.get_stats()
+        total_elapsed = time.monotonic() - start_time
         logger.error(
             "groq_all_retries_exhausted",
             max_retries=self.max_retries,
+            total_elapsed=round(total_elapsed, 1),
             pool_stats=pool_stats,
         )
-        raise RuntimeError(
+        raise RateLimitExhaustedError(
             f"Groq API call failed after {self.max_retries} attempts across "
-            f"{pool.size} API keys. Last error: {last_error}"
+            f"{pool.size} API keys in {total_elapsed:.0f}s. Last error: {last_error}"
         )

@@ -1,15 +1,14 @@
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from langchain_core.messages import AIMessage
 from langchain_core.prompts import ChatPromptTemplate
 
 from agent.llm import LLMFactory
 from agent.state import AgentState
-from agent.architectural_artifacts import ArchitecturalPlan, ArchitecturalArtifacts
+from agent.architectural_artifacts import ArchitecturalPlan, ArchitecturalArtifacts, ReactFlowGraph
 from agent.adr_manager import ADRManager
-from agent.mermaid_validator import is_valid_mermaid
 from agent.state_manager import merge_state_updates, log_state_transition
 from core.logger import get_logger
 from models.llm_profile import LLMProfile
@@ -19,28 +18,33 @@ logger = get_logger(__name__)
 # Prompt for generating system architecture diagrams in JSON format
 ARCH_PLANNER_PROMPT = ChatPromptTemplate.from_messages([
     ("system", """You are a senior software architect. Your job is to design a high-level system architecture layout for the project described in the project plan.
-You must generate five distinct Mermaid diagrams:
-1. system_diagram: graph TB showing high-level containers/tiers (e.g. Client, Server, DB).
-2. component_diagram: flowchart LR showing logical components inside the application.
-3. data_flow_diagram: graph LR showing data pipelines or request-response flows.
-4. sequence_diagrams: A list containing exactly 1 sequenceDiagram of a primary user interaction flow.
-5. deployment_diagram: graph TB showing physical deployment nodes (e.g. Docker, Hosting, Cloud).
+You must generate five distinct architectural graphs in React Flow compatible format:
+1. system_diagram: high-level containers/tiers (e.g. Client, Server, DB).
+2. component_diagram: logical components inside the application.
+3. data_flow_diagram: data pipelines or request-response flows.
+4. sequence_diagrams: A list containing exactly 1 flowchart simulating a sequence diagram.
+5. deployment_diagram: physical deployment nodes (e.g. Docker, Hosting, Cloud).
 
-CRITICAL Mermaid v11.15.0 Syntax Rules:
-- Diagram header must be valid (e.g., `graph TD`, `flowchart LR`, `sequenceDiagram`).
-- All node IDs must be simple alphanumeric strings with NO spaces or special characters (e.g., `DatabaseNode` not `Database Node`).
-- You MUST double-quote all node labels that contain spaces, parentheses, brackets, or special characters: e.g., `A["Component (details)"]` is valid, `A[Component (details)]` is INVALID.
-- Do NOT use HTML tags in node labels (e.g., no `<b>` or `<br>`).
-- Ensure all brackets `[]`, braces `{{}}`, parentheses `()`, and quotes `""` are balanced on each line.
-- For relationships, use standard arrows like `-->`, `-.->`, or `==>`.
+CRITICAL React Flow JSON Syntax Rules:
+- The output MUST be a JSON object containing the five keys above.
+- The value for `sequence_diagrams` MUST be an array containing exactly one graph object.
+- All other keys MUST map to a single graph object.
+- Each graph object MUST have a `nodes` array and an `edges` array.
+- Each node MUST be an object with an `id` (string) and a `data` object containing a `label` (string). Do not generate coordinates/positions.
+- Each edge MUST be an object with an `id` (string), `source` (string matching a node id), and `target` (string matching a node id).
 
 Format your output strictly as a JSON object, with NO markdown formatting, NO prose, and NO trailing commas:
 {{
-    "system_diagram": "graph TB\\n  Client[\"Web Client (Browser)\"] --> App[\"Backend App (Node.js)\"]\\n  App --> DB[\"Database (PostgreSQL)\"]",
-    "component_diagram": "flowchart LR\\n  UI[\"Frontend UI\"] --> Auth[\"Auth Service\"]\\n  Auth --> UserDB[\"User Database\"]",
-    "data_flow_diagram": "graph LR\\n  User[\"User Input\"] --> API[\"API Gateway\"]\\n  API --> Process[\"Data Processor\"]",
-    "sequence_diagrams": ["sequenceDiagram\\n  participant U as User\\n  participant A as API\\n  U->>A: Request Data\\n  A-->>U: Return JSON"],
-    "deployment_diagram": "graph TB\\n  User[\"User\"] --> CDN[\"Cloudflare CDN\"]\\n  CDN --> Server[\"Production Server\"]"
+    "system_diagram": {{
+        "nodes": [{{"id": "client", "data": {{"label": "Web Client"}}}}, {{"id": "api", "data": {{"label": "API Backend"}}}}],
+        "edges": [{{"id": "e-client-api", "source": "client", "target": "api"}}]
+    }},
+    "component_diagram": {{ "nodes": [], "edges": [] }},
+    "data_flow_diagram": {{ "nodes": [], "edges": [] }},
+    "sequence_diagrams": [
+        {{ "nodes": [], "edges": [] }}
+    ],
+    "deployment_diagram": {{ "nodes": [], "edges": [] }}
 }}
 """),
     ("human", """PROJECT PLAN:
@@ -72,7 +76,7 @@ def _resolve_arch_llm(state: AgentState):
 async def architecture_plan_node(state: AgentState) -> AgentState:
     """
     LangGraph Node: Architectural Planning phase.
-    Generates Mermaid diagrams and ADRs based on the bootstrap plan.
+    Generates diagrams and ADRs based on the bootstrap plan.
     Runs immediately after plan_bootstrap.
     """
     session_id = state.get("session_id", "")
@@ -109,7 +113,7 @@ async def architecture_plan_node(state: AgentState) -> AgentState:
             feedback = ""
             
         if feedback:
-            previous_feedback_context = f"PREVIOUS GENERATION FEEDBACK (Please resolve these errors):\n{feedback}\n"
+            previous_feedback_context = f"PREVIOUS GENERATION FEEDBACK (Please resolve these errors):\\n{feedback}\\n"
 
     logger.info(
         "arch_plan_node_start",
@@ -130,7 +134,7 @@ async def architecture_plan_node(state: AgentState) -> AgentState:
 
         raw_text = response.content
         from agent.nodes import extract_plan_json
-        json_str = extract_plan_json(raw_text)
+        json_str = extract_plan_json(str(raw_text))
         artifacts = ArchitecturalArtifacts.model_validate_json(json_str)
 
         # 3. Create ADRs
@@ -142,7 +146,7 @@ async def architecture_plan_node(state: AgentState) -> AgentState:
 
         # 4. Construct complete ArchitecturalPlan
         arch_plan = ArchitecturalPlan(
-            architecture_generated_at=datetime.utcnow().isoformat() + "Z",
+            architecture_generated_at=datetime.now(timezone.utc).isoformat() + "Z",
             architectural_artifacts=artifacts,
             architecture_decisions=adrs,
             architecture_approved=True,
@@ -158,6 +162,11 @@ async def architecture_plan_node(state: AgentState) -> AgentState:
             "architecture_phase": "Complete",
             "status": "research",  # Node transition state
             "judge_attempts": 0,   # Reset judge attempts upon new architecture
+            "execute_retry_count": 0, # Reset retry counters on planning escalation
+            "validate_retry_count": 0,
+            "retries": 0,
+            "backend_retries": 0,
+            "frontend_retries": 0,
             "messages": [AIMessage(content=f"[Architecture Plan Complete] Generated 5 diagrams & 3 ADRs for tech stack: {tech_stack_summary}.")]
         }
 
@@ -169,15 +178,16 @@ async def architecture_plan_node(state: AgentState) -> AgentState:
         logger.error("arch_plan_node_failed", session_id=session_id, error=str(e))
         
         # Mark as Rejected with error details
+        fallback_graph = ReactFlowGraph(nodes=[{"id": "error", "data": {"label": "Failed to generate architecture"}}], edges=[])
         rejected_plan = ArchitecturalPlan(
-            architecture_generated_at=datetime.utcnow().isoformat() + "Z",
+            architecture_generated_at=datetime.now(timezone.utc).isoformat() + "Z",
             # Fallback empty artifacts to allow compilation
             architectural_artifacts=ArchitecturalArtifacts(
-                system_diagram="graph TD\n    A[Error] --> B[Failed]",
-                component_diagram="graph TD\n    A[Error] --> B[Failed]",
-                data_flow_diagram="graph TD\n    A[Error] --> B[Failed]",
-                sequence_diagrams=["sequenceDiagram\n    A->>B: Error"],
-                deployment_diagram="graph TD\n    A[Error] --> B[Failed]"
+                system_diagram=fallback_graph,
+                component_diagram=fallback_graph,
+                data_flow_diagram=fallback_graph,
+                sequence_diagrams=[fallback_graph],
+                deployment_diagram=fallback_graph
             ),
             architecture_decisions=[],
             architecture_approved=False,

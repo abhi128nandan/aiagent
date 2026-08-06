@@ -104,6 +104,8 @@ class EmbeddingEngine:
     def __init__(self, collection_name: str = COLLECTION_NAME):
         self.collection_name = collection_name
         self._collection = None
+        # Lexical index for hybrid retrieval: document_id -> [{text, metadata, tokens}]
+        self._lexical_index: Dict[str, List[Dict]] = {}
 
     @property
     def collection(self):
@@ -170,6 +172,9 @@ class EmbeddingEngine:
             metadatas=metadatas,
         )
 
+        # Build lexical index for hybrid retrieval
+        self._build_lexical_index(chunks, document_id)
+
         logger.info(
             "chunks_stored",
             document_id=document_id,
@@ -179,22 +184,45 @@ class EmbeddingEngine:
 
         return len(chunks)
 
-    def search(
+    @staticmethod
+    def _tokenize(text: str) -> List[str]:
+        """Simple whitespace + punctuation tokenizer for lexical search."""
+        import re
+        # Lowercase, split on non-alphanumeric, filter short tokens
+        tokens = re.findall(r'[a-zA-Z0-9_]+', text.lower())
+        return [t for t in tokens if len(t) > 1]
+
+    def _build_lexical_index(self, chunks: List, document_id: str) -> None:
+        """Build an in-memory term-frequency index for lexical search."""
+        entries = []
+        for chunk in chunks:
+            tokens = self._tokenize(chunk.text)
+            # Compute term frequencies
+            tf: Dict[str, int] = {}
+            for token in tokens:
+                tf[token] = tf.get(token, 0) + 1
+            entries.append({
+                "text": chunk.text,
+                "tokens": tokens,
+                "tf": tf,
+                "metadata": {
+                    "document_id": document_id,
+                    "chunk_index": chunk.chunk_index,
+                    **{k: str(v) for k, v in chunk.metadata.items()},
+                },
+            })
+        self._lexical_index[document_id] = entries
+        logger.info("lexical_index_built", document_id=document_id, entries=len(entries))
+
+    def _semantic_search(
         self,
         query: str,
         top_k: int = 5,
         document_id: Optional[str] = None,
     ) -> List[Dict]:
         """
-        Semantic search for relevant chunks.
-
-        Args:
-            query: Search query string
-            top_k: Number of results to return
-            document_id: Optional filter by document ID
-
-        Returns:
-            List of dicts with {text, score, metadata}
+        Pure semantic (vector) search via ChromaDB.
+        Internal method — use search() for hybrid results.
         """
         query_embedding = self.embed([query])[0]
 
@@ -219,14 +247,171 @@ class EmbeddingEngine:
                     "metadata": results["metadatas"][0][i] if results["metadatas"] else {},
                 })
 
+        return search_results
+
+    def lexical_search(
+        self,
+        query: str,
+        top_k: int = 5,
+        document_id: Optional[str] = None,
+    ) -> List[Dict]:
+        """
+        Keyword/lexical search over stored chunks.
+
+        Uses BM25 if rank_bm25 is installed, otherwise falls back to
+        a pure-Python TF-IDF keyword overlap scorer.
+
+        Returns:
+            List of dicts with {text, score, metadata} — same format as semantic search.
+        """
+        # Collect all indexed entries for the target document(s)
+        entries = []
+        if document_id and document_id in self._lexical_index:
+            entries = self._lexical_index[document_id]
+        elif not document_id:
+            for doc_entries in self._lexical_index.values():
+                entries.extend(doc_entries)
+
+        if not entries:
+            return []
+
+        query_tokens = self._tokenize(query)
+        if not query_tokens:
+            return []
+
+        # Try BM25 if available
+        try:
+            from rank_bm25 import BM25Okapi
+            corpus = [e["tokens"] for e in entries]
+            bm25 = BM25Okapi(corpus)
+            scores = bm25.get_scores(query_tokens)
+            scored = list(zip(scores, entries))
+            scored.sort(key=lambda x: x[0], reverse=True)
+            results = []
+            for score, entry in scored[:top_k]:
+                if score > 0:
+                    results.append({
+                        "text": entry["text"],
+                        "score": float(score),
+                        "metadata": entry["metadata"],
+                    })
+            return results
+        except ImportError:
+            pass
+
+        # Fallback: TF-IDF-style keyword overlap scoring
+        query_token_set = set(query_tokens)
+        scored = []
+        for entry in entries:
+            tf = entry["tf"]
+            # Score = sum of TF for matching query tokens, normalized by doc length
+            match_score = sum(tf.get(qt, 0) for qt in query_token_set)
+            if match_score > 0 and entry["tokens"]:
+                normalized = match_score / len(entry["tokens"])
+                scored.append((normalized, entry))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [
+            {
+                "text": entry["text"],
+                "score": float(score),
+                "metadata": entry["metadata"],
+            }
+            for score, entry in scored[:top_k]
+        ]
+
+    @staticmethod
+    def _rrf_merge(
+        semantic_results: List[Dict],
+        lexical_results: List[Dict],
+        top_k: int = 5,
+        k: int = 60,
+    ) -> List[Dict]:
+        """
+        Reciprocal Rank Fusion (RRF) merge of two ranked result sets.
+
+        RRF_score = Σ 1/(k + rank)  where k=60 is the standard constant.
+
+        Deduplicates by text[:200] to avoid counting the same chunk twice.
+        """
+        # Map text_key -> {text, score, metadata}
+        merged: Dict[str, Dict] = {}
+
+        for rank, result in enumerate(semantic_results):
+            text_key = result["text"][:200]
+            if text_key not in merged:
+                merged[text_key] = {
+                    "text": result["text"],
+                    "score": 0.0,
+                    "metadata": result["metadata"],
+                }
+            merged[text_key]["score"] += 1.0 / (k + rank)
+
+        for rank, result in enumerate(lexical_results):
+            text_key = result["text"][:200]
+            if text_key not in merged:
+                merged[text_key] = {
+                    "text": result["text"],
+                    "score": 0.0,
+                    "metadata": result["metadata"],
+                }
+            merged[text_key]["score"] += 1.0 / (k + rank)
+
+        # Sort by fused score, return top_k
+        ranked = sorted(merged.values(), key=lambda x: x["score"], reverse=True)
+        return ranked[:top_k]
+
+    def search(
+        self,
+        query: str,
+        top_k: int = 5,
+        document_id: Optional[str] = None,
+    ) -> List[Dict]:
+        """
+        Hybrid search: semantic (ChromaDB vector) + lexical (keyword/BM25),
+        merged via Reciprocal Rank Fusion (RRF).
+
+        Falls back to semantic-only if the lexical index is empty.
+
+        Args:
+            query: Search query string
+            top_k: Number of results to return
+            document_id: Optional filter by document ID
+
+        Returns:
+            List of dicts with {text, score, metadata}
+        """
+        # Semantic pass
+        semantic_results = self._semantic_search(query, top_k=top_k, document_id=document_id)
+
+        # Lexical pass
+        lexical_results = self.lexical_search(query, top_k=top_k, document_id=document_id)
+
+        # If no lexical results, return semantic-only (backward compat)
+        if not lexical_results:
+            logger.info(
+                "rag_search",
+                query=query[:80],
+                results=len(semantic_results),
+                mode="semantic_only",
+                top_score=round(semantic_results[0]["score"], 3) if semantic_results else 0,
+            )
+            return semantic_results
+
+        # RRF merge
+        merged = self._rrf_merge(semantic_results, lexical_results, top_k=top_k)
+
         logger.info(
             "rag_search",
             query=query[:80],
-            results=len(search_results),
-            top_score=round(search_results[0]["score"], 3) if search_results else 0,
+            results=len(merged),
+            mode="hybrid_rrf",
+            semantic_count=len(semantic_results),
+            lexical_count=len(lexical_results),
+            top_score=round(merged[0]["score"], 3) if merged else 0,
         )
 
-        return search_results
+        return merged
 
     def search_multiple(
         self,

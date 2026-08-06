@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Any, Dict
 
 class TechStack(BaseModel):
@@ -18,10 +18,20 @@ class Step(BaseModel):
     description: str = Field(description="Detailed description of the changes to make")
 
 class ApiContract(BaseModel):
-    route: str = Field(description="API route path")
-    method: str = Field(description="HTTP method")
-    description: str = Field(description="Description of the endpoint")
-    response_schema: Dict[str, Any] = Field(description="JSON schema object of the response")
+    endpoint: str = Field(default="", description="API route or endpoint path")
+    method: str = Field(default="GET", description="HTTP method")
+    description: Optional[str] = Field(default="", description="Description of the endpoint")
+    response_schema: Optional[Dict[str, Any]] = Field(default=None, description="JSON schema object of the response")
+    route: Optional[str] = Field(default=None, description="Legacy field name for endpoint")
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            target = data.get("endpoint") or data.get("route") or data.get("path") or ""
+            data["endpoint"] = target
+            data["route"] = target
+        return data
 
 class BootstrapPlan(BaseModel):
     project: str = Field(description="Project name")

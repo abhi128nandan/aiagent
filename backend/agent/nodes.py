@@ -32,6 +32,16 @@ from models.llm_profile import LLMProfile
 settings = get_settings()
 logger = get_logger(__name__)
 
+DYNAMIC_SCAFFOLD_TEMPLATES = {
+    "vue":         {"command": "npm create vite@latest . -- --template vue", "run_command": "npm run dev -- --host 0.0.0.0 > app.log 2>&1 &"},
+    "angular":     {"command": "npx -y @angular/cli new . --skip-git --defaults", "run_command": "ng serve --host 0.0.0.0 > app.log 2>&1 &"},
+    "nextjs":      {"command": "npx -y create-next-app@latest . --ts --app --no-git --yes", "run_command": "npm run dev -- --hostname 0.0.0.0 > app.log 2>&1 &"},
+    "fastapi":     {"command": "pip install fastapi uvicorn --break-system-packages", "run_command": "uvicorn main:app --host 0.0.0.0 --port 8000 > app.log 2>&1 &"},
+    "flask":       {"command": "pip install flask --break-system-packages", "run_command": "python3 app.py > app.log 2>&1 &"},
+    "django":      {"command": "pip install django --break-system-packages && django-admin startproject core .", "run_command": "python3 manage.py runserver 0.0.0.0:8000 > app.log 2>&1 &"},
+    "spring_boot": {"command": "curl -s https://start.spring.io/starter.zip -d dependencies=web -o project.zip && unzip -o project.zip && rm project.zip", "run_command": "./mvnw spring-boot:run > app.log 2>&1 &"},
+}
+
 # ── Module-level singletons ────────────────────────────────────────────
 
 _error_analyzer = ErrorAnalyzer()
@@ -139,6 +149,23 @@ def _get_model_name(state: AgentState, role: str | None = None) -> str:
 def extract_plan_json(content: str) -> str:
     """Keep planner output to the first valid JSON block."""
     import json as _json
+    import re
+
+    def sanitize_json_string(s: str) -> str:
+        # Strip backtick blocks assigned to content/code/diff/implementation
+        s = re.sub(r'"(?:content|code|diff|implementation)"\s*:\s*`[\s\S]*?`\s*,?', '', s)
+        
+        # Strip double-quoted blocks assigned to content/code/diff/implementation
+        schema_keys = ["file", "action", "description", "steps", "api_contract", "project", "tech_stack", "environment", "template_selected", "run_command"]
+        keys_pattern = "|".join(schema_keys)
+        pattern = r'"(?:content|code|diff|implementation)"\s*:\s*[\s\S]*?(?=\s*,\s*"(?:' + keys_pattern + r')"\s*:|\s*,\s*\}|\s*\})'
+        s = re.sub(pattern, '', s)
+        
+        # Remove trailing commas inside objects and arrays
+        s = re.sub(r',\s*\}', '}', s)
+        s = re.sub(r',\s*\]', ']', s)
+        return s
+
     fenced = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', content)
     candidate = fenced.group(1).strip() if fenced else content.strip()
 
@@ -150,6 +177,15 @@ def extract_plan_json(content: str) -> str:
     except _json.JSONDecodeError:
         pass
 
+    # Try sanitizing the candidate
+    sanitized = sanitize_json_string(candidate)
+    try:
+        if sanitized.startswith('{') or sanitized.startswith('['):
+            _json.loads(sanitized)
+            return sanitized
+    except _json.JSONDecodeError:
+        pass
+
     # Fallback path: find the first { and the last }
     start = candidate.find('{')
     end = candidate.rfind('}')
@@ -158,6 +194,14 @@ def extract_plan_json(content: str) -> str:
         try:
             _json.loads(sliced)
             return sliced
+        except _json.JSONDecodeError:
+            pass
+
+        # Try sanitizing the sliced candidate
+        sanitized_sliced = sanitize_json_string(sliced)
+        try:
+            _json.loads(sanitized_sliced)
+            return sanitized_sliced
         except _json.JSONDecodeError:
             pass
 
@@ -295,9 +339,12 @@ MICROAGENTS = {
 - List all dependencies in `requirements.txt`.
 """,
     "abap": """
-## ABAP Web App Developer Guidance
-- Transpile using @abaplint tools. Render HTML content via `WRITE:` blocks.
-- Attach a timestamp parameter when executing the module to prevent transpiled caching issues.
+## Senior SAP ABAP Enterprise Architect Guidelines
+- Do NOT attempt to compile, execute, preview, or validate the ABAP code locally.
+- Generate source code only. Assume the code will later be imported into SAP.
+- Follow the 16-stage methodology (Requirement Analysis -> Business Domain Detection -> ... -> Documentation).
+- Every business module must have its own package (e.g., ZCORE, ZAUTH).
+- Output comprehensive repository folders (packages/, dictionary/, classes/, etc.).
 """
 }
 
@@ -379,7 +426,7 @@ async def load_workspace_repo_agent(runtime) -> str | None:
     return None
 
 
-async def get_dynamic_microagent_instructions(plan_str: str, message_history: list, runtime) -> str:
+async def get_dynamic_microagent_instructions(plan_str: str, message_history: list, runtime, session_id: str = "") -> str:
     instructions = []
     
     # 1. Check for Repository-specific instructions first
@@ -387,7 +434,16 @@ async def get_dynamic_microagent_instructions(plan_str: str, message_history: li
     if repo_agent_content:
         instructions.append("## Repository-Specific Guidelines\n" + repo_agent_content)
     
-    # 2. Match global microagents
+    # 2. Load AGENTS.md knowledge vault (cached per session)
+    try:
+        from agent.rules_loader import AgentsRulesLoader
+        agents_rules = AgentsRulesLoader.get_rules(session_id, plan_str, message_history)
+        if agents_rules:
+            instructions.append(agents_rules)
+    except Exception as e:
+        logger.warning("agents_md_load_failed", error=str(e))
+    
+    # 3. Match global microagents
     # Combine plan and latest message content to search for keywords
     context_text = plan_str.lower()
     for msg in message_history[-3:]:
@@ -442,7 +498,7 @@ def detect_language_from_content(content: str) -> str | None:
     return None
 
 
-def guess_path_from_language(language: str | None, plan_files: list[str] = None) -> str | None:
+def guess_path_from_language(language: str | None, plan_files: list[str] | None = None) -> str | None:
     if not plan_files or not language:
         return None
     
@@ -472,7 +528,7 @@ def guess_path_from_language(language: str | None, plan_files: list[str] = None)
     return None
 
 
-def parse_action(content: str, plan_files: list[str] = None) -> ActionType:
+def parse_action(content: str, plan_files: list[str] | None = None) -> ActionType:
     """Extracts XML tags like <run>, <write path="...">, <think>, <finish> with robust fallback handling."""
     matches = []
 
@@ -572,7 +628,7 @@ def parse_action(content: str, plan_files: list[str] = None) -> ActionType:
     return UnknownAction(content=content)
 
 
-def parse_all_actions(content: str, plan_files: list[str] = None) -> list[ActionType]:
+def parse_all_actions(content: str, plan_files: list[str] | None = None) -> list[ActionType]:
     """Extract ALL actions from LLM response in document order.
     
     Enables multi-action per turn: the LLM can batch multiple
@@ -678,6 +734,7 @@ async def execute_actions_batch(
 
     for i, action in enumerate(actions):
         if isinstance(action, CmdRunAction):
+            from agent.schema import CmdRunAction
             action = CmdRunAction(command=sanitize_command(action.command))
             # Pre-validate command to auto-fix common failure patterns
             from agent.command_validator import CommandValidator
@@ -687,6 +744,7 @@ async def execute_actions_batch(
                 logger.info("command_pre_validated", session_id=session_id,
                             original=action.command[:100], fixed=validated.command[:100],
                             warning=validated.warning)
+                from agent.schema import CmdRunAction
                 action = CmdRunAction(command=validated.command)
                 if ws_callback:
                     await ws_callback({"type": "command_auto_fixed", "original": action.command[:100], "fixed": validated.command[:100], "warning": validated.warning})
@@ -805,6 +863,20 @@ async def execute_actions_batch(
                     warnings=validation.warnings,
                 )
 
+        if isinstance(action, CmdRunAction):
+            try:
+                import json as _json
+                _plan_obj = _json.loads(state.get('plan', '{}'))
+                if _plan_obj.get('tech_stack', {}).get('language') == 'abap':
+                    observations.append(f"[{action.type}] exit=0 | Execution skipped for ABAP.")
+                    succeeded += 1
+                    last_obs = CmdOutputObservation(output="Execution skipped for ABAP.", exit_code=0)
+                    if ws_callback:
+                        await ws_callback({"type": "action_exec", "action": action.type, "command": getattr(action, 'command', ''), "exit_code": 0, "output": "Execution skipped for ABAP."})
+                    continue
+            except Exception:
+                pass
+
         obs_dict = await runtime.execute(action)
         exit_code = obs_dict.get('exit_code', 1)
         output = obs_dict.get('output', '')
@@ -812,6 +884,12 @@ async def execute_actions_batch(
         if isinstance(action, FileWriteAction):
             files_written.append(action.path)
             _get_memory_manager(session_id).update_working_memory(file_written=action.path)
+            # Track structured todo status
+            try:
+                from agent.todo_manager import TodoManager
+                TodoManager(session_id).mark_file_in_progress(action.path)
+            except Exception:
+                pass
 
         # Smart truncation: suppress noisy package manager output
         lines = output.splitlines()
@@ -872,6 +950,16 @@ async def execute_actions_batch(
     except Exception as e:
         logger.warning("failed_to_update_tasks_todo", session_id=session_id, error=str(e))
 
+    # Persist structured todo state (marks written files as completed)
+    try:
+        from agent.todo_manager import TodoManager
+        todo_mgr = TodoManager(session_id)
+        for fp in files_written:
+            todo_mgr.mark_file_completed(fp)
+        await todo_mgr.save(runtime)
+    except Exception as e:
+        logger.warning("failed_to_persist_todo_state", session_id=session_id, error=str(e))
+
     return {
         'last_obs': last_obs,
         'retries': retries,
@@ -896,7 +984,7 @@ async def plan_bootstrap_node(state: AgentState) -> AgentState:
     - Empty steps[] (file-level steps come in Phase 2: plan_refine_node)
     """
     from .state_manager import merge_state_updates, log_state_transition
-    from datetime import datetime
+    from datetime import datetime, timezone
     
     old_status = state.get('status', 'plan')
     session_id = state.get('session_id', '')
@@ -985,7 +1073,7 @@ async def plan_bootstrap_node(state: AgentState) -> AgentState:
         from runtime import DockerRuntime
         from agent.schema import CmdRunAction
         runtime = DockerRuntime.get(session_id)
-        probe_cmd = "echo '--- HOST ENVIRONMENT ---' && uname -a && cat /etc/os-release 2>/dev/null | grep PRETTY_NAME && command -v lsof >/dev/null || echo 'WARNING: lsof is not installed. Use pkill or fuser instead.' && command -v fuser >/dev/null || echo 'WARNING: fuser is not installed. Use pkill instead.' && command -v pkill >/dev/null || echo 'WARNING: pkill is not installed.'"
+        probe_cmd = "echo '--- HOST ENVIRONMENT ---' && uname -a && (cat /etc/os-release 2>/dev/null | grep PRETTY_NAME || true) && (command -v lsof >/dev/null || echo 'WARNING: lsof is not installed. Use pkill or fuser instead.') && (command -v fuser >/dev/null || echo 'WARNING: fuser is not installed. Use pkill instead.') && (command -v pkill >/dev/null || echo 'WARNING: pkill is not installed.')"
         probe_result = await runtime.execute(CmdRunAction(command=probe_cmd))
         env_discovery = probe_result.get('output', 'Environment details unavailable.')
     except Exception as e:
@@ -1021,7 +1109,7 @@ async def plan_bootstrap_node(state: AgentState) -> AgentState:
         try:
             response = await chain.ainvoke(fit['components'], config={"callbacks": [handler]})
             raw_text = response.content
-            json_str = extract_plan_json(raw_text)
+            json_str = extract_plan_json(str(raw_text))
             parsed_plan = BootstrapPlan.model_validate_json(json_str)
             plan_json = parsed_plan.model_dump_json()
         except Exception as e:
@@ -1052,7 +1140,7 @@ async def plan_bootstrap_node(state: AgentState) -> AgentState:
         try:
             response = await chain.ainvoke(fit['components'], config={"callbacks": [handler]})
             raw_text = response.content
-            json_str = extract_plan_json(raw_text)
+            json_str = extract_plan_json(str(raw_text))
             parsed_plan = BootstrapPlan.model_validate_json(json_str)
             plan_json = parsed_plan.model_dump_json()
         except Exception as e:
@@ -1108,6 +1196,19 @@ async def plan_bootstrap_node(state: AgentState) -> AgentState:
         parsed = _json.loads(plan_json)
         if isinstance(parsed, dict) and "tech_stack" in parsed:
             tech_stack = parsed["tech_stack"]
+            # Auto-correct runtime for vanilla HTML/CSS/JS projects
+            # The LLM sometimes outputs runtime: ["node"] even when the run_command uses python3
+            if (tech_stack.get('frontend') == 'html_css_js'
+                    and tech_stack.get('backend') == 'none'
+                    and tech_stack.get('language') != 'abap'):
+                env = parsed.get('environment', {})
+                if isinstance(env, dict) and env.get('runtime') == ['node']:
+                    env['runtime'] = ['python3']
+                    parsed['environment'] = env
+                    plan_json = _json.dumps(parsed)
+                    logger.info("plan_bootstrap_runtime_autocorrected",
+                                session_id=session_id,
+                                corrected_runtime=['python3'])
     except Exception:
         pass
 
@@ -1117,6 +1218,12 @@ async def plan_bootstrap_node(state: AgentState) -> AgentState:
         'status': 'setup_env',
         'plan_generated_at': datetime.now().isoformat(),
         'current_task_index': 0,
+        'execute_retry_count': 0,
+        'validate_retry_count': 0,
+        'retries': 0,
+        'backend_retries': 0,
+        'frontend_retries': 0,
+        'judge_attempts': 0,
         'messages': [AIMessage(content=f'Plan ready:\n{plan_json}')],
         'token_count': current_tokens,
         'context_budget': ctx_manager.budget.to_dict(),
@@ -1170,7 +1277,7 @@ async def setup_environment_node(state: AgentState) -> AgentState:
     - Logs state transitions
     """
     from .state_manager import merge_state_updates, log_state_transition
-    from datetime import datetime
+    from datetime import datetime, timezone
     
     old_status = state.get('status', 'setup_env')
     session_id = state.get('session_id', '')
@@ -1343,6 +1450,21 @@ async def setup_environment_node(state: AgentState) -> AgentState:
         pass
 
     if template_selected:
+        # Normalize template name to handle variations like 'react-vite-ts' -> 'react-vite'
+        import os
+        _backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        _templates_dir = os.path.join(_backend_dir, "templates")
+        _normalized = template_selected.lower().strip()
+        if os.path.exists(_templates_dir):
+            _available = [d for d in os.listdir(_templates_dir) if os.path.isdir(os.path.join(_templates_dir, d))]
+            if _normalized in _available:
+                template_selected = _normalized
+            else:
+                for _avail in _available:
+                    if _avail in _normalized or _normalized in _avail:
+                        template_selected = _avail
+                        break
+
         logger.info("setup_env_copying_template", session_id=session_id, template=template_selected)
         setup_log.append(f"Copying template: {template_selected}")
 
@@ -1383,13 +1505,36 @@ async def setup_environment_node(state: AgentState) -> AgentState:
                 elif os.path.exists(os.path.join(template_src_dir, "requirements.txt")):
                     setup_log.append("Installing pip dependencies from template...")
                     await runtime.execute(CmdRunAction(command="pip install -r requirements.txt"))
+                
+                # If Python backend requested alongside frontend template (e.g. React + FastAPI)
+                if backend in ['fastapi', 'flask', 'django']:
+                    setup_log.append(f"Installing Python backend dependencies for '{backend}'...")
+                    await runtime.execute(CmdRunAction(command="pip install fastapi uvicorn pydantic sqlalchemy --break-system-packages 2>&1 | tail -3"))
                     
             except Exception as e:
                 setup_log.append(f"Template copy failed: {str(e)}")
                 logger.warning("setup_env_template_failed", session_id=session_id, error=str(e))
+        elif template_selected in DYNAMIC_SCAFFOLD_TEMPLATES:
+            try:
+                os.makedirs(workspace_dest_dir, exist_ok=True)
+                scaffold_cmd = DYNAMIC_SCAFFOLD_TEMPLATES[template_selected]["command"]
+                setup_log.append(f"Running dynamic scaffold for '{template_selected}': {scaffold_cmd}")
+                result = await runtime.execute(CmdRunAction(command=scaffold_cmd))
+                exit_code = result.get('exit_code', 0) if isinstance(result, dict) else getattr(result, 'exit_code', 0)
+                output = result.get('output', '') if isinstance(result, dict) else getattr(result, 'output', '')
+                if exit_code != 0:
+                    raise Exception(f"Scaffold command failed with exit code {exit_code}: {output[:300]}")
+                scaffold_completed = True
+                setup_log.append(f"Dynamic scaffold '{template_selected}' completed.")
+                logger.info("setup_env_dynamic_scaffold_success", session_id=session_id, template=template_selected)
+            except Exception as e:
+                setup_log.append(f"Dynamic scaffold failed: {str(e)}")
+                logger.warning("setup_env_dynamic_scaffold_failed", session_id=session_id, template=template_selected, error=str(e))
+                from agent.exceptions import TemplateNotFoundError
+                raise TemplateNotFoundError(template_selected, template_src_dir)
         else:
-            setup_log.append(f"Template failed: directory '{template_src_dir}' not found.")
-            logger.warning("setup_env_template_not_found", session_id=session_id, path=template_src_dir)
+            from agent.exceptions import TemplateNotFoundError
+            raise TemplateNotFoundError(template_selected, template_src_dir)
     else:
         # No template selected — mark as completed
         scaffold_completed = True
@@ -1400,7 +1545,7 @@ async def setup_environment_node(state: AgentState) -> AgentState:
         'status': 'plan_refine',
         'messages': [AIMessage(content=f'[Environment Setup Complete]\n{environment_info}\n\nScaffold: {"completed" if scaffold_completed else "failed or skipped"}')],
         'environment_ready': True,
-        'setup_completed_at': datetime.utcnow().isoformat(),
+        'setup_completed_at': datetime.now(timezone.utc).isoformat(),
         'scaffold_completed': scaffold_completed,
     }
     
@@ -1427,7 +1572,7 @@ async def plan_refine_node(state: AgentState) -> AgentState:
     5. Routes to the Judge for approval
     """
     from .state_manager import merge_state_updates, log_state_transition
-    from datetime import datetime
+    from datetime import datetime, timezone
     
     old_status = state.get('status', 'plan_refine')
     session_id = state.get('session_id', '')
@@ -1511,7 +1656,22 @@ async def plan_refine_node(state: AgentState) -> AgentState:
         try:
             import json as _json
             if hasattr(arch_plan_obj, "model_dump_json"):
-                architectural_plan_str = arch_plan_obj.model_dump_json(indent=2)
+                # Extract only the useful summary fields, not the full graph JSON
+                arch_summary_parts = []
+                if hasattr(arch_plan_obj, 'tech_stack_summary') and arch_plan_obj.tech_stack_summary:
+                    arch_summary_parts.append(f"Tech Stack: {arch_plan_obj.tech_stack_summary}")
+                if hasattr(arch_plan_obj, 'estimated_complexity') and arch_plan_obj.estimated_complexity:
+                    arch_summary_parts.append(f"Complexity: {arch_plan_obj.estimated_complexity}")
+                if hasattr(arch_plan_obj, 'architecture_decisions') and arch_plan_obj.architecture_decisions:
+                    decisions = arch_plan_obj.architecture_decisions
+                    for adr in decisions[:3]:  # Limit to 3 ADRs
+                        if hasattr(adr, 'title'):
+                            arch_summary_parts.append(f"ADR: {adr.title} - {getattr(adr, 'decision', '')}")
+                if arch_summary_parts:
+                    architectural_plan_str = "\n".join(arch_summary_parts)
+                else:
+                    # Fallback to compact JSON without diagram graph data
+                    architectural_plan_str = arch_plan_obj.model_dump_json(indent=2)
             elif isinstance(arch_plan_obj, dict):
                 architectural_plan_str = _json.dumps(arch_plan_obj, indent=2)
             else:
@@ -1600,9 +1760,15 @@ async def plan_refine_node(state: AgentState) -> AgentState:
     messages = state.get('messages', [])
     pruned_messages = ctx_manager.prune_messages(messages)
 
-    from .prompts import REFINE_PLANNER_SYSTEM_PROMPT, REFINE_PLAN_SCHEMA_INSTRUCTIONS
+    from .prompts import REFINE_PLANNER_SYSTEM_PROMPT, REFINE_PLAN_SCHEMA_INSTRUCTIONS, ABAP_SYSTEM_INSTRUCTIONS, ABAP_REFINE_INSTRUCTIONS
+
+    # Conditionally include ABAP instructions only for ABAP projects
+    is_abap = tech_stack.get('language', '').lower() == 'abap'
+    system_prompt = REFINE_PLANNER_SYSTEM_PROMPT + (ABAP_SYSTEM_INSTRUCTIONS if is_abap else '')
+    schema_instructions = REFINE_PLAN_SCHEMA_INSTRUCTIONS + (ABAP_REFINE_INSTRUCTIONS if is_abap else '')
+
     fit = ctx_manager.fit_request(
-        system_text=REFINE_PLANNER_SYSTEM_PROMPT + REFINE_PLAN_SCHEMA_INSTRUCTIONS,
+        system_text=system_prompt + schema_instructions,
         components={
             'srs_text':          {'text': srs,                    'share': 0.20, 'keep': 'head'},
             'bootstrap_plan':    {'text': bootstrap_plan,         'share': 0.10, 'keep': 'head'},
@@ -1616,14 +1782,20 @@ async def plan_refine_node(state: AgentState) -> AgentState:
 
     # ── Call the Refine Planner LLM ────────────────────────────────────
     from agent.plan_models import DetailPlan
-    chain = plan_refine_prompt | llm
+    from langchain_core.prompts import ChatPromptTemplate
+    # Build the refine prompt dynamically with conditional ABAP instructions
+    dynamic_refine_prompt = ChatPromptTemplate.from_messages([
+        ('system', system_prompt),
+        ('human',  'ORIGINAL REQUIREMENTS:\n{srs_text}\n\nBOOTSTRAP PLAN (from Phase 1):\n{bootstrap_plan}\n\nARCHITECTURAL PLAN:\n{architectural_plan}\n\nWORKSPACE CONTEXT (scaffolded files on disk):\n{workspace_context}\n\nENVIRONMENT INFO:\n{environment_info}\n\nRESEARCH CONTEXT:\n{research_context}\n\n{judge_feedback}\n\n' + schema_instructions),
+    ])
+    chain = dynamic_refine_prompt | llm
     from agent.observability import ObservabilityCallbackHandler
     handler = ObservabilityCallbackHandler(session_id, "Detail Planner Agent")
 
     try:
         response = await chain.ainvoke(fit['components'], config={"callbacks": [handler]})
         raw_text = response.content
-        json_str = extract_plan_json(raw_text)
+        json_str = extract_plan_json(str(raw_text))
         parsed_plan = DetailPlan.model_validate_json(json_str)
         detail_plan_json = parsed_plan.model_dump_json()
     except Exception as e:
@@ -1665,6 +1837,11 @@ async def plan_refine_node(state: AgentState) -> AgentState:
         'plan': detail_plan_json,
         'status': 'judge',
         'planning_phase': 'refine',
+        'execute_retry_count': 0,
+        'validate_retry_count': 0,
+        'retries': 0,
+        'backend_retries': 0,
+        'frontend_retries': 0,
         'plan_generated_at': datetime.now().isoformat(),
         'messages': [AIMessage(content=f'[Detail Plan Ready]\n{detail_plan_json}')],
         'token_count': current_tokens,
@@ -1686,6 +1863,14 @@ async def plan_refine_node(state: AgentState) -> AgentState:
         runtime = DockerRuntime.get(session_id)
         if runtime:
             await update_tasks_todo(runtime, session_id, new_state)
+            # Also initialize structured todo persistence
+            try:
+                from agent.todo_manager import TodoManager
+                todo_mgr = TodoManager(session_id)
+                todo_mgr.sync_from_plan(detail_plan_json)
+                await todo_mgr.save(runtime)
+            except Exception as e:
+                logger.warning("failed_to_init_structured_todos", session_id=session_id, error=str(e))
     except Exception as e:
         logger.warning("failed_to_initialize_tasks_todo", session_id=session_id, error=str(e))
 
@@ -1791,6 +1976,8 @@ async def implement_node(state: AgentState) -> AgentState:
     
     # ── Phase 3: Workspace Context ─────────────────────────────────────
     runtime = DockerRuntime.get(session_id) if session_id else None
+    if not runtime:
+        return state
     workspace_context = ""
     
     try:
@@ -1799,8 +1986,9 @@ async def implement_node(state: AgentState) -> AgentState:
             local_ws_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "workspaces", session_id))
             if os.path.exists(local_ws_path):
                 error_file = None
-                if 'parsed_error' in locals() and parsed_error:
-                    error_file = parsed_error.file
+                parsed_error = locals().get('parsed_error')
+                if parsed_error:
+                    error_file = getattr(parsed_error, 'file', None)
 
                 user_query = ""
                 if state.get('messages'):
@@ -1891,7 +2079,8 @@ async def implement_node(state: AgentState) -> AgentState:
     microagent_rules = await get_dynamic_microagent_instructions(
         state.get('plan', ''),
         messages,
-        runtime
+        runtime,
+        session_id=session_id,
     )
     research_ctx = state.get('research_context', '') or 'No web research available. Use <search>query</search> to look up information.'
     if microagent_rules:
@@ -1940,6 +2129,8 @@ async def implement_node(state: AgentState) -> AgentState:
     content = ""
     parser = StreamingMessageParser()
     runtime = DockerRuntime.get(session_id) if session_id else None
+    if not runtime:
+        return state
 
     executed_actions = []
     accumulated_batch_results = {
@@ -1988,6 +2179,7 @@ async def implement_node(state: AgentState) -> AgentState:
             if event.action == "write":
                 action = FileWriteAction(path=event.path, content=event.content)
             elif event.action == "run":
+                from agent.schema import CmdRunAction
                 action = CmdRunAction(command=event.content)
             elif event.action == "search":
                 action = WebSearchAction(query=event.content)
@@ -2102,6 +2294,7 @@ async def execute_node(state: AgentState) -> AgentState:
         action = UnknownAction(content='')
     else:
         if isinstance(action, CmdRunAction):
+            from agent.schema import CmdRunAction
             action = CmdRunAction(command=sanitize_command(action.command))
 
     locked_files = state.get('locked_files', [])
@@ -2126,6 +2319,7 @@ async def execute_node(state: AgentState) -> AgentState:
         updates = {
             'last_obs': obs,
             'retries': state.get('retries', 0) + 1,
+            'execute_retry_count': state.get('execute_retry_count', 0) + 1,
             'messages': [HumanMessage(content='Observation: Invalid action format. You MUST use exactly ONE of the XML tags: <run>, <write>, or <finish>. Example: <run>ls</run>. DO NOT use markdown code blocks or plain text.')],
         }
         new_state = merge_state_updates(state, updates)
@@ -2174,6 +2368,23 @@ async def execute_node(state: AgentState) -> AgentState:
         log_state_transition(session_id, old_status, old_status, {'action': 'search'})
         return new_state
         
+    if isinstance(action, CmdRunAction):
+        try:
+            import json as _json
+            _plan_obj = _json.loads(state.get('plan', '{}'))
+            if _plan_obj.get('tech_stack', {}).get('language') == 'abap':
+                obs = CmdOutputObservation(output="Execution skipped for ABAP.", exit_code=0)
+                updates = {
+                    'last_obs': obs,
+                    'retries': 0,
+                    'messages': [HumanMessage(content="Observation: Command execution skipped because project language is ABAP.")],
+                }
+                new_state = merge_state_updates(state, updates)
+                log_state_transition(session_id, old_status, old_status, {'action': 'run_skipped_abap'})
+                return new_state
+        except Exception:
+            pass
+
     obs_dict = await runtime.execute(action)
     
     # ── Phase 2: Error analysis on execution results ────────────────────
@@ -2195,10 +2406,12 @@ async def execute_node(state: AgentState) -> AgentState:
         )
 
         retries = state.get('retries', 0) + 1
+        exec_retries = state.get('execute_retry_count', 0) + 1
 
         updates = {
             'last_obs': obs,
             'retries': retries,
+            'execute_retry_count': exec_retries,
             'messages': [HumanMessage(
                 content=f"Observation:\nExit code: {obs.exit_code}\n\n{error_context}"
             )],
@@ -2247,6 +2460,7 @@ async def execute_node(state: AgentState) -> AgentState:
             updates = {
                 'last_obs': obs,
                 'retries': state.get('retries', 0) + 1,
+                'execute_retry_count': state.get('execute_retry_count', 0) + 1,
                 'messages': [HumanMessage(
                     content=f"Observation:\nExit code: {obs.exit_code}\n\n{error_context}"
                 )],
@@ -2264,6 +2478,7 @@ async def execute_node(state: AgentState) -> AgentState:
             return new_state
         
     retries = state.get('retries', 0) + (1 if getattr(obs, 'exit_code', 0) != 0 else 0)
+    exec_retries = state.get('execute_retry_count', 0) + (1 if getattr(obs, 'exit_code', 0) != 0 else 0)
     
     # ── Phase 3: Update workspace summary after successful actions ──
     workspace_update = {}
@@ -2303,6 +2518,7 @@ async def execute_node(state: AgentState) -> AgentState:
     result_state_updates: dict = {
         'last_obs': obs,
         'retries': retries,
+        'execute_retry_count': exec_retries,
         'messages': [HumanMessage(content=f"Observation:\nExit code: {getattr(obs, 'exit_code', 0)}\nOutput:\n{truncated_output}")],
         'execution_results': [{
             'action': action.type,
@@ -2554,6 +2770,7 @@ JSON Response:"""
                 
                 # Extract JSON block
                 import json as _json
+                import re as _re
                 fenced = _re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', res_text)
                 if fenced:
                     res_text = fenced.group(1)
@@ -2652,7 +2869,7 @@ JSON Response:"""
     if app_started and app_url:
         try:
             # Check root endpoint
-            root_health = await runtime.health_check(port=app_port)
+            root_health = await runtime.health_check(port=app_port or 3000)
             status_code = root_health.get('status_code', 0)
             http_details['root_status'] = status_code
             http_details['root_healthy'] = root_health.get('healthy', False)
@@ -2720,7 +2937,7 @@ JSON Response:"""
         # Wait 3 seconds and check if app is still alive
         await asyncio.sleep(3.0)
         try:
-            recheck = await runtime.health_check(port=app_port)
+            recheck = await runtime.health_check(port=app_port or 3000)
             stability_passed = recheck.get('healthy', False)
             stability_details['recheck_status'] = recheck.get('status_code', 0)
             stability_details['still_alive'] = stability_passed
@@ -2839,10 +3056,12 @@ JSON Response:"""
         pass
 
     new_status = 'done' if obs.app_started else 'error'
+    validate_retries = state.get('validate_retry_count', 0) + (0 if obs.app_started else 1)
 
     updates = {
         'last_obs': obs,
         'status': new_status,
+        'validate_retry_count': validate_retries,
         'messages': [AIMessage(content=f'Validation: {obs.output}')],
         'validation_results': [validation_details],
         'validation_passed': obs.app_started,
@@ -2858,3 +3077,106 @@ JSON Response:"""
         'stability_passed': stability_passed,
     })
     return new_state
+
+
+async def execute_structural_check(state: AgentState) -> AgentState:
+    """
+    Two-tier structural verification gate before semantic execution evaluation.
+    Checks that previous commands had exit_code == 0 AND expected output files/binaries exist on disk.
+    Pure Python check (no LLM call).
+    """
+    from .state_manager import merge_state_updates
+    from runtime import DockerRuntime
+    from .schema import CmdRunAction
+    import json
+    
+    session_id = state.get('session_id', '')
+    last_obs = state.get('last_obs')
+    
+    # 1. Check if the most recent execution or action batch failed with non-zero exit code
+    exit_code = getattr(last_obs, 'exit_code', 0) if last_obs else 0
+    if exit_code != 0:
+        logger.warning("execute_structural_check_failed_exit_code", session_id=session_id, exit_code=exit_code)
+        updates = {
+            'execute_structural_ok': False,
+            'messages': [AIMessage(content=f"[Execute Structural Check] Previous command exited with non-zero code {exit_code}.")]
+        }
+        return merge_state_updates(state, updates)
+        
+    # 2. Check if expected output files exist on disk (for non-ABAP repos)
+    plan_str = state.get('plan', '{}')
+    is_abap = False
+    try:
+        plan_dict = json.loads(plan_str)
+        if plan_dict.get('tech_stack', {}).get('language') == 'abap':
+            is_abap = True
+    except Exception:
+        pass
+
+    if not is_abap and session_id:
+        runtime = DockerRuntime.get(session_id)
+        modified_files = state.get('modified_files', [])
+        if runtime and modified_files:
+            for fpath in modified_files[:5]:
+                full_path = f"/workspace/{fpath.lstrip('/')}"
+                res = await runtime.execute(CmdRunAction(command=f"test -f '{full_path}' || test -d '{full_path}'"))
+                if res.get('exit_code') != 0:
+                    logger.warning("execute_structural_check_missing_file", session_id=session_id, file=fpath)
+                    updates = {
+                        'execute_structural_ok': False,
+                        'messages': [AIMessage(content=f"[Execute Structural Check] Expected output file {fpath} does not exist on disk.")]
+                    }
+                    return merge_state_updates(state, updates)
+                    
+    updates = {
+        'execute_structural_ok': True
+    }
+    return merge_state_updates(state, updates)
+
+
+async def validate_structural_check(state: AgentState) -> AgentState:
+    """
+    Two-tier structural verification gate before semantic validation node.
+    Checks that a test report file was actually produced and is parseable (or required build/config artifacts exist).
+    Pure Python check (no LLM call).
+    """
+    from .state_manager import merge_state_updates
+    from runtime import DockerRuntime
+    from .schema import CmdRunAction
+    import json
+    
+    session_id = state.get('session_id', '')
+    plan_str = state.get('plan', '{}')
+    tech_stack = {}
+    try:
+        plan_dict = json.loads(plan_str)
+        tech_stack = plan_dict.get('tech_stack', {})
+    except Exception:
+        pass
+
+    # For ABAP or simple static HTML without framework, skip test report requirement
+    lang = tech_stack.get('language', '').lower()
+    backend = tech_stack.get('backend', '').lower()
+    frontend = tech_stack.get('frontend', '').lower()
+    if lang == 'abap' or backend == 'abap' or (frontend == 'html_css_js' and backend == 'none'):
+        updates = {'validate_structural_ok': True}
+        return merge_state_updates(state, updates)
+        
+    if session_id:
+        runtime = DockerRuntime.get(session_id)
+        if runtime:
+            res = await runtime.execute(CmdRunAction(
+                command="find /workspace -maxdepth 3 \( -name '*test-report*.*' -o -name '*junit*.*' -o -name '*coverage*.*' -o -name 'package.json' -o -name 'pytest.ini' -o -name 'pyproject.toml' -o -name 'requirements.txt' \) 2>/dev/null | head -n 1"
+            ))
+            output = res.get('output', '').strip()
+            if res.get('exit_code') != 0 or not output:
+                logger.warning("validate_structural_check_no_report_or_config", session_id=session_id)
+                updates = {
+                    'validate_structural_ok': False,
+                    'messages': [AIMessage(content="[Validate Structural Check] No test report file or validation manifest found in workspace.")]
+                }
+                return merge_state_updates(state, updates)
+                
+    updates = {'validate_structural_ok': True}
+    return merge_state_updates(state, updates)
+
