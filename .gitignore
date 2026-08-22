@@ -5,3 +5,5 @@ frontend/node_modules/
 __pycache__/
 *.pyc
 backend/.chroma_db/
+workspaces/
+

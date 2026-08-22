@@ -29,6 +29,21 @@ _REPLAN_ERROR_CATEGORIES = frozenset({
 })
 
 
+def _is_abap_project(state: AgentState) -> bool:
+    """Check if the current project is ABAP (closed-service, no sandbox needed)."""
+    import json
+    try:
+        plan = json.loads(state.get('plan', '{}'))
+        if plan.get('tech_stack', {}).get('language', '').lower() == 'abap':
+            return True
+    except Exception:
+        pass
+    tech_stack = state.get('tech_stack', {})
+    if isinstance(tech_stack, dict) and tech_stack.get('language', '').lower() == 'abap':
+        return True
+    return False
+
+
 def route_after_execute(state: AgentState) -> str:
     """
     Intelligent retry routing (Issue #5).
@@ -344,6 +359,9 @@ def route_after_research(state: AgentState) -> str:
         return "research"
     if status == "error":
         return "error"
+    # ABAP bypass: skip environment setup (closed SAP service)
+    if _is_abap_project(state):
+        return "plan_refine"
     return "setup_environment"
 
 def route_after_setup(state: AgentState) -> str:
@@ -413,9 +431,12 @@ def route_after_validate_structural(state: AgentState) -> str:
 def route_subagents(state: AgentState) -> str:
     """
     Route between subagent nodes based on status.
-    Returns END for ABAP validate or unrecognized states (fail-safe).
+    Returns END for ABAP done/validate or unrecognized states (fail-safe).
     """
     status = state.get("status", "error")
+    # ABAP bypass: merge → done → END (skip execute/validate entirely)
+    if status == "done":
+        return END
     if status == "validate":
         try:
             import json as _json
@@ -605,6 +626,7 @@ async def build_graph(checkpointer=None):
     g.add_conditional_edges('research', route_after_research, {
         'research': 'research',
         'setup_environment': 'setup_environment',
+        'plan_refine': 'plan_refine',         # ABAP bypass: skip setup_env
         'error': 'error_handler',
     })
     g.add_conditional_edges('setup_environment', route_after_setup, {

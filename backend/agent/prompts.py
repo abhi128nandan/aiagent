@@ -68,9 +68,9 @@ steps yet — those will be added in a detail planning phase after scaffolding.
   "project": "project name",
   "description": "one-line description",
   "tech_stack": {{
-    "frontend": "react" or "html_css_js" or "vue" or "angular" or "none",
-    "backend": "express" or "fastapi" or "flask" or "spring_boot" or "none",
-    "database": "postgresql" or "mongodb" or "sqlite" or "mysql" or "none",
+    "frontend": "react" or "html_css_js" or "vue" or "angular" or "sap_ui5" or "none",
+    "backend": "express" or "fastapi" or "flask" or "spring_boot" or "abap" or "none",
+    "database": "postgresql" or "mongodb" or "sqlite" or "mysql" or "sap_hana" or "none",
     "language": "javascript" or "typescript" or "python" or "java" or "go" or "abap"
   }},
   "environment": {{
@@ -94,7 +94,7 @@ RULES for environment detection:
 - Provide the exact 'template_selected' matching the requested framework. The backend will copy the template files automatically.
 - "template_selected" MUST be exactly one of: "react-vite", "express", "vue", "angular", "nextjs", "fastapi", "flask", "django", "spring_boot", or "none". Do NOT invent other names like "react-vite-ts".
 - If this is an EXISTING project (workspace context shows existing files), set template_selected to "none" — do NOT re-scaffold.
-- If the language is ABAP, set template_selected to "none" and run_command to "" (empty string). Do NOT scaffold.
+- If the language is ABAP or project involves SAP UI5 + ABAP Cloud: set language to "abap", backend to "abap", frontend to "sap_ui5" (or "html_css_js"), database to "sap_hana" (or "none"), template_selected to "none", and run_command to "" (empty string). Do NOT set frontend or backend to "none" when SAP UI5 frontend and ABAP backend are requested in the SRS.
 - For FULLSTACK projects (where both frontend != "none" and backend != "none", e.g., React + FastAPI): "run_command" MUST start BOTH services from root. DO NOT include "cd backend", "pip install", or "npm install" inside run_command (dependencies are installed automatically during setup). Example for React + FastAPI: "python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 > backend.log 2>&1 & npm run dev -- --host 0.0.0.0 > app.log 2>&1 &"
 - Keep `steps` as an empty array [] — file-level steps are generated in the detail phase.
 """
@@ -148,19 +148,26 @@ CRITICAL RULES:
 
 # ABAP-specific instructions appended only when language is 'abap'
 ABAP_REFINE_INSTRUCTIONS = """
-6. **ABAP Repositories**: If the language is `abap`, you MUST generate a complete 16-stage enterprise repository structure. Do NOT generate standard MVC web folders (like `src/`, `components/`, `routes/`, or `package.json`). Instead, plan files in all of the following designated folders:
+6. **ABAP & SAP UI5 Repositories**: If the language is `abap`, you MUST generate a complete enterprise repository structure covering BOTH backend ABAP Cloud objects and frontend SAP UI5 objects.
+   Backend ABAP Folders:
    - `docs/` (e.g., `docs/requirement_analysis.md`, `docs/architecture.md`, `docs/technical_documentation.md`)
-   - `packages/` (e.g., `packages/zcore/`, `packages/zcalculator/`)
-   - `dictionary/` (e.g., `dictionary/ztable.tabl.xml` for database tables, domains, data elements)
-   - `classes/` (e.g., `classes/zcl_calculator.clas.abap`, `classes/zif_calculator.intf.abap` for classes and interfaces)
-   - `reports/` (e.g., `reports/zcalculator_prog.prog.abap` for reports/executable programs)
-   - `module_pools/` (e.g., `module_pools/zcalculator_mp.prog.abap` for dialog programs)
-   - `functions/` (e.g., `functions/zfm_calculator.fugr.abap` for function modules)
-   - `forms/` (e.g., `forms/zsmartform.sf.xml`, `forms/zadobeform.pdf.xml` for Smart Forms and Adobe Forms)
-   - `cds_views/` (e.g., `cds_views/zddls_calculator.ddls.asddls` for Core Data Services views)
-   - `odata/` (e.g., `odata/zcalculator_srv.xml` for OData service definitions)
-   - `workflows/` (e.g., `workflows/zcalculator_wf.xml` for SAP Business Workflows)
-   - `auth/` (e.g., `auth/zcalculator_auth.auth.xml` for authorization objects)
+   - `packages/` (e.g., `packages/zcore/`, `packages/ztodo/`)
+   - `dictionary/` (e.g., `dictionary/ztodo_table.tabl.xml` for database tables, domains, data elements)
+   - `classes/` (e.g., `classes/zcl_todo_service.clas.abap`, `classes/zif_todo_service.intf.abap` for classes and interfaces)
+   - `reports/` (e.g., `reports/ztodo_report.prog.abap` for reports/executable programs)
+   - `module_pools/` (e.g., `module_pools/ztodo_mp.prog.abap`)
+   - `functions/` (e.g., `functions/zfm_todo.fugr.abap` for function modules)
+   - `forms/` (e.g., `forms/zsmartform.sf.xml`)
+   - `cds_views/` (e.g., `cds_views/zddls_todo.ddls.asddls` for Core Data Services views)
+   - `odata/` (e.g., `odata/ztodo_srv.xml` for OData service definitions)
+   - `workflows/` (e.g., `workflows/ztodo_wf.xml`)
+   - `auth/` (e.g., `auth/ztodo_auth.auth.xml`)
+   Frontend SAP UI5 Folders:
+   - `webapp/manifest.json` (UI5 App Descriptor)
+   - `webapp/Component.js` (UI5 Root Component)
+   - `webapp/view/Main.view.xml` (SAP UI5 XML Views)
+   - `webapp/controller/Main.controller.js` (SAP UI5 Controller)
+   - `webapp/i18n/i18n.properties` (UI5 Text Translations)
 """
 
 PLANNER_SYSTEM_PROMPT = """You are the bootstrap planner in a multi-agent code generation pipeline.
@@ -186,7 +193,7 @@ CRITICAL RULES:
 
 # ABAP-specific system instructions appended only when language is 'abap'
 ABAP_SYSTEM_INSTRUCTIONS = """
-6. **ABAP Repositories**: If the language is `abap`, you MUST generate the complete 16-stage enterprise repository structure. Do NOT generate standard MVC web folders (like `src/`, `components/`, `routes/`, or `package.json`). Instead, map out files in the designated folders: `docs/`, `packages/`, `dictionary/`, `classes/`, `reports/`, `module_pools/`, `functions/`, `forms/`, `cds_views/`, `odata/`, `workflows/`, and `auth/`. Include files for all folders to ensure completeness.
+6. **ABAP & SAP UI5 Repositories**: If the language is `abap`, you MUST map out files for BOTH backend ABAP objects (`docs/`, `packages/`, `dictionary/`, `classes/`, `reports/`, `module_pools/`, `functions/`, `forms/`, `cds_views/`, `odata/`, `workflows/`, `auth/`) and frontend SAP UI5 objects (`webapp/manifest.json`, `webapp/Component.js`, `webapp/view/`, `webapp/controller/`, `webapp/i18n/`). Include files across both domains to ensure a complete full-stack enterprise deliverable.
 """
 
 # ── Bootstrap Plan Prompt ──────────────────────────────────────────────────
