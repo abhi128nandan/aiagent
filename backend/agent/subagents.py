@@ -26,6 +26,7 @@ _BACKEND_PATTERNS = (
     'views.py', 'urls.py', 'settings.py',
     'routers/', 'schemas/',
     'src/main/java/', 'application.properties', 'application.yml',
+    'classes/', 'reports/', 'module_pools/', 'functions/', 'dictionary/', 'cds_views/', 'odata/', 'workflows/', 'auth/', 'packages/', '.clas.abap', '.intf.abap', '.prog.abap', '.fugr.abap', '.ddls.asddls',
 )
 
 _FRONTEND_PATTERNS = (
@@ -38,6 +39,7 @@ _FRONTEND_PATTERNS = (
     'tailwind.config', 'postcss.config', 'vite.config', 'next.config',
     'tsconfig', 'package.json',
     'app/', 'lib/', 'src/app/',
+    'webapp/', 'ui5/', 'view/', 'controller/', 'Component.js', 'manifest.json', 'ui5.yaml', '.view.xml', '.controller.js',
 )
 
 _SHARED_FILES = (
@@ -213,8 +215,15 @@ async def backend_subagent_node(state: AgentState) -> AgentState:
         }
         logger.info("backend_subagent_retrying", retries=retries + 1)
         return merge_state_updates(result_state, updates)
+        
+    if has_errors and retries >= 3:
+        updates = {
+            'status': 'error',
+            'messages': [AIMessage(content="[Backend Subagent] Fatal implementation error. Max retries exceeded.")],
+        }
+        return merge_state_updates(result_state, updates)
     
-    # Success or max retries reached — proceed to frontend
+    # Success — proceed to frontend
     updates = {
         'status': 'frontend_subagent',
         'messages': [AIMessage(content="[Backend Subagent] Backend code committed. Handing off to Frontend Subagent.")],
@@ -257,6 +266,25 @@ async def frontend_subagent_node(state: AgentState) -> AgentState:
     
     # Restore the original full plan
     result_state['plan'] = original_plan
+    
+    # Handle retries
+    retries = state.get('frontend_retries', 0)
+    has_errors = result_state.get('has_execution_errors', False) or result_state.get('status') == 'error'
+    
+    if has_errors and retries < 3:
+        updates = {
+            'frontend_retries': retries + 1,
+            'status': 'frontend_subagent',  # Loop back to itself
+        }
+        logger.info("frontend_subagent_retrying", retries=retries + 1)
+        return merge_state_updates(result_state, updates)
+        
+    if has_errors and retries >= 3:
+        updates = {
+            'status': 'error',
+            'messages': [AIMessage(content="[Frontend Subagent] Fatal implementation error. Max retries exceeded.")],
+        }
+        return merge_state_updates(result_state, updates)
     
     updates = {
         'status': 'contract_check',
@@ -366,8 +394,24 @@ async def contract_check_node(state: AgentState) -> AgentState:
 async def merge_workspace_node(state: AgentState) -> AgentState:
     """
     Merge to Workspace Node — finalizes subagent work and proceeds to execution.
+    For ABAP projects, skips execution entirely (closed SAP environment).
     """
-    logger.info("merge_workspace_running", session_id=state.get('session_id'))
+    session_id = state.get('session_id')
+    logger.info("merge_workspace_running", session_id=session_id)
+
+    # ABAP bypass: skip execute/validate, go directly to done
+    try:
+        plan = _json.loads(state.get('plan', '{}'))
+        if plan.get('tech_stack', {}).get('language', '').lower() == 'abap':
+            logger.info("merge_abap_bypass", session_id=session_id)
+            updates = {
+                'status': 'done',
+                'messages': [AIMessage(content="[Merge] ABAP codebase generated successfully. No runtime execution needed — deploy to your SAP system.")],
+            }
+            return merge_state_updates(state, updates)
+    except Exception:
+        pass
+
     updates = {
         'status': 'execute',
         'messages': [AIMessage(content="[Merge] Code merged to workspace. Proceeding to execution.")],

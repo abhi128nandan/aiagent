@@ -69,7 +69,7 @@ class RateLimitedGroqLLM(BaseChatModel):
         response = await llm.ainvoke([HumanMessage(content="Hello")])
     """
 
-    model: str = "groq/llama-3.3-70b-versatile"
+    model: str = "groq/openai/gpt-oss-120b"
     temperature: float = 0.2
     max_tokens: Optional[int] = None
     max_retries: int = 10  # Total retries across all keys
@@ -245,7 +245,25 @@ class RateLimitedGroqLLM(BaseChatModel):
                     await asyncio.sleep(min(1.0, retry_after / 10))
                     continue
 
-                # Non-rate-limit error — backoff and retry
+                # Non-rate-limit error — check if it's a non-retryable model error (404 / deprecated)
+                is_not_found = any(
+                    indicator in error_str
+                    for indicator in [
+                        "model_not_found",
+                        "does not exist",
+                        "deprecated",
+                        "not_found",
+                        "404",
+                    ]
+                )
+                if is_not_found:
+                    logger.error(
+                        "groq_model_not_found_or_deprecated",
+                        model=self.model,
+                        error=str(e)[:200],
+                    )
+                    raise e
+
                 if current_key:
                     pool.report_error(current_key)
 

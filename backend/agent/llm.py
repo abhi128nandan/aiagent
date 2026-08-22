@@ -13,6 +13,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.callbacks import CallbackManagerForLLMRun, AsyncCallbackManagerForLLMRun
 from langchain_core.messages import BaseMessage, AIMessage
 from langchain_core.outputs import ChatResult, ChatGeneration
+from langchain_community.chat_models import ChatLiteLLM
 
 from core.config import get_settings
 from core.logger import get_logger
@@ -69,9 +70,11 @@ class LLMFactory:
         """
         fallbacks = []
         
-        # Order of fallbacks: Anthropic (Claude) -> OpenAI -> Ollama
+        # Order of fallbacks: Gemini -> Anthropic (Claude) -> OpenAI -> Ollama
         providers_to_try = []
-        if primary_provider == "gemini":
+        if primary_provider == "groq":
+            providers_to_try = ["gemini", "anthropic", "openai", "ollama"]
+        elif primary_provider == "gemini":
             providers_to_try = ["anthropic", "openai", "ollama"]
         elif primary_provider == "anthropic":
             providers_to_try = ["openai", "ollama"]
@@ -80,7 +83,9 @@ class LLMFactory:
         
         for p in providers_to_try:
             try:
-                if p == "anthropic":
+                if p == "gemini":
+                    fallbacks.append(self._create_gemini(None, temperature, max_tokens, role))
+                elif p == "anthropic":
                     fallbacks.append(self._create_anthropic(None, temperature, max_tokens))
                 elif p == "openai":
                     fallbacks.append(self._create_openai(None, temperature, max_tokens))
@@ -141,13 +146,13 @@ class LLMFactory:
         elif settings.DEFAULT_LLM_MODEL and settings.DEFAULT_LLM_MODEL.startswith("groq/"):
             model = settings.DEFAULT_LLM_MODEL
         elif role == "planner":
-            model = "groq/llama-3.3-70b-versatile"
+            model = "groq/openai/gpt-oss-120b"
         elif role == "coder":
-            model = "groq/meta-llama/llama-4-scout-17b-16e-instruct"
+            model = "groq/qwen/qwen3.6-27b"
         elif role == "validator":
-            model = "groq/llama-3.1-8b-instant"
+            model = "groq/groq/compound-mini"
         else:
-            model = "groq/llama-3.3-70b-versatile"
+            model = "groq/openai/gpt-oss-120b"
 
         # Ensure groq/ prefix
         if not model.startswith("groq/"):

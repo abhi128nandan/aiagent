@@ -381,6 +381,69 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                                     ))
                                 )}
                             </div>
+
+                            <div className="pt-4 border-t border-border mt-6 space-y-4">
+                                <h3 className="text-sm font-bold text-text">Subagent Assignments</h3>
+                                <div className="space-y-3">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 border border-border bg-surface rounded-xl gap-2 shadow-xs">
+                                        <div className="space-y-0.5">
+                                            <h4 className="font-bold text-text">Frontend Subagent</h4>
+                                            <p className="text-text-muted">LLM profile for frontend tasks.</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <select
+                                                value={generalSettings.role_profile_frontend || ''}
+                                                onChange={e => handleUpdateSetting('role_profile_frontend', e.target.value)}
+                                                className="w-48 bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs text-text focus:border-brand outline-none"
+                                            >
+                                                <option value="">Use Default Profile</option>
+                                                {profiles.map(p => (
+                                                    <option key={p.id} value={p.id}>{p.model} ({p.provider})</option>
+                                                ))}
+                                            </select>
+                                            {actionLoading === 'role_profile_frontend' && <Loader2 size={14} className="animate-spin text-brand" />}
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 border border-border bg-surface rounded-xl gap-2 shadow-xs">
+                                        <div className="space-y-0.5">
+                                            <h4 className="font-bold text-text">Backend Subagent</h4>
+                                            <p className="text-text-muted">LLM profile for backend tasks.</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <select
+                                                value={generalSettings.role_profile_backend || ''}
+                                                onChange={e => handleUpdateSetting('role_profile_backend', e.target.value)}
+                                                className="w-48 bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs text-text focus:border-brand outline-none"
+                                            >
+                                                <option value="">Use Default Profile</option>
+                                                {profiles.map(p => (
+                                                    <option key={p.id} value={p.id}>{p.model} ({p.provider})</option>
+                                                ))}
+                                            </select>
+                                            {actionLoading === 'role_profile_backend' && <Loader2 size={14} className="animate-spin text-brand" />}
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 border border-border bg-surface rounded-xl gap-2 shadow-xs">
+                                        <div className="space-y-0.5">
+                                            <h4 className="font-bold text-text">Architecture Planner</h4>
+                                            <p className="text-text-muted">LLM profile for architecture planning.</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <select
+                                                value={generalSettings.role_profile_planner || ''}
+                                                onChange={e => handleUpdateSetting('role_profile_planner', e.target.value)}
+                                                className="w-48 bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs text-text focus:border-brand outline-none"
+                                            >
+                                                <option value="">Use Default Profile</option>
+                                                {profiles.map(p => (
+                                                    <option key={p.id} value={p.id}>{p.model} ({p.provider})</option>
+                                                ))}
+                                            </select>
+                                            {actionLoading === 'role_profile_planner' && <Loader2 size={14} className="animate-spin text-brand" />}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     ) : activeTab === 'sandbox' ? (
                         <div className="space-y-4">

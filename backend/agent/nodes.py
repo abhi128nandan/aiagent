@@ -734,7 +734,6 @@ async def execute_actions_batch(
 
     for i, action in enumerate(actions):
         if isinstance(action, CmdRunAction):
-            from agent.schema import CmdRunAction
             action = CmdRunAction(command=sanitize_command(action.command))
             # Pre-validate command to auto-fix common failure patterns
             from agent.command_validator import CommandValidator
@@ -744,7 +743,6 @@ async def execute_actions_batch(
                 logger.info("command_pre_validated", session_id=session_id,
                             original=action.command[:100], fixed=validated.command[:100],
                             warning=validated.warning)
-                from agent.schema import CmdRunAction
                 action = CmdRunAction(command=validated.command)
                 if ws_callback:
                     await ws_callback({"type": "command_auto_fixed", "original": action.command[:100], "fixed": validated.command[:100], "warning": validated.warning})
@@ -1334,9 +1332,25 @@ async def setup_environment_node(state: AgentState) -> AgentState:
     database = tech_stack.get('database', 'none')
     language = tech_stack.get('language', '')
 
+    # ── ABAP bypass: skip environment setup entirely ──
+    if language.lower() == 'abap':
+        logger.info("setup_env_abap_bypass", session_id=session_id)
+        environment_info = "Language: abap\nRuntime: SAP closed environment (no local sandbox)\nNo packages/tools to install."
+        updates = {
+            'environment_info': environment_info,
+            'status': 'plan_refine',
+            'messages': [AIMessage(content='[Environment Setup] ABAP project detected — skipping sandbox setup. Code will be generated for SAP deployment.')],
+            'environment_ready': True,
+            'setup_completed_at': datetime.now(timezone.utc).isoformat(),
+            'scaffold_completed': True,
+        }
+        new_state = merge_state_updates(state, updates)
+        log_state_transition(session_id, old_status, 'plan_refine', {'reason': 'abap_bypass'})
+        return new_state
+
     if not runtimes_needed:
         runtimes_needed = []
-        if frontend in ('react', 'vue', 'angular', 'next', 'svelte') or language in ('javascript', 'typescript', 'abap'):
+        if frontend in ('react', 'vue', 'angular', 'next', 'svelte') or language in ('javascript', 'typescript'):
             runtimes_needed.append('node')
         if backend in ('fastapi', 'flask', 'django') or language == 'python':
             runtimes_needed.append('python3')
@@ -3097,8 +3111,18 @@ async def execute_structural_check(state: AgentState) -> AgentState:
     exit_code = getattr(last_obs, 'exit_code', 0) if last_obs else 0
     if exit_code != 0:
         logger.warning("execute_structural_check_failed_exit_code", session_id=session_id, exit_code=exit_code)
+        structural_retries = state.get('execute_structural_retries', 0)
+        if structural_retries >= 3:
+            updates = {
+                'status': 'error',
+                'execute_structural_ok': False,
+                'messages': [AIMessage(content="[Execute Structural Check] Failed structural checks too many times.")]
+            }
+            return merge_state_updates(state, updates)
+            
         updates = {
             'execute_structural_ok': False,
+            'execute_structural_retries': structural_retries + 1,
             'messages': [AIMessage(content=f"[Execute Structural Check] Previous command exited with non-zero code {exit_code}.")]
         }
         return merge_state_updates(state, updates)

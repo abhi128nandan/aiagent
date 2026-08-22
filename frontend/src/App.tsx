@@ -272,7 +272,7 @@ function App() {
               <div className="border-r border-border bg-surface">
                 <SessionSidebar />
               </div>
-              <div className="flex-1 h-full max-w-4xl mx-auto border-x border-border bg-surface shadow-xl">
+              <div className="flex-1 flex flex-col h-full max-w-4xl mx-auto border-x border-border bg-surface shadow-xl w-full">
                 <Chat />
               </div>
             </div>

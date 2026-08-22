@@ -205,7 +205,7 @@ class GroqKeyPool:
 
     async def acquire(
         self,
-        model: str = "llama-3.3-70b-versatile",
+        model: str = "groq/openai/gpt-oss-120b",
         max_wait: float = 300.0,
     ) -> str:
         """

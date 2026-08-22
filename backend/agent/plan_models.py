@@ -2,9 +2,9 @@ from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Any, Dict
 
 class TechStack(BaseModel):
-    frontend: str = Field(description="Frontend framework: react, html_css_js, vue, angular, or none")
-    backend: str = Field(description="Backend framework: express, fastapi, flask, spring_boot, or none")
-    database: str = Field(description="Database: postgresql, mongodb, sqlite, mysql, or none")
+    frontend: str = Field(description="Frontend framework: react, html_css_js, vue, angular, sap_ui5, or none")
+    backend: str = Field(description="Backend framework: express, fastapi, flask, spring_boot, abap, or none")
+    database: str = Field(description="Database: postgresql, mongodb, sqlite, mysql, sap_hana, or none")
     language: str = Field(description="Programming language: javascript, typescript, python, java, go, or abap")
 
 class Environment(BaseModel):
