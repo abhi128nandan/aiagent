@@ -74,7 +74,7 @@ export const YantrikaLandingPage: React.FC<YantrikaLandingPageProps> = ({ onStar
             </button>
             <button
               onClick={() => { if (onOpenApp) onOpenApp(); else onStartBuilding(); }}
-              className="h-9 px-5 inline-flex items-center gap-2 rounded-xl bg-text text-white text-sm font-medium hover:bg-text/90 transition-colors shadow-sm"
+              className="h-9 px-5 inline-flex items-center gap-2 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-hover transition-all shadow-[0_2px_8px_rgba(244,122,32,0.25)] hover:shadow-[0_4px_12px_rgba(244,122,32,0.4)]"
             >
               Launch App <ArrowRight size={14} />
             </button>
@@ -115,7 +115,7 @@ export const YantrikaLandingPage: React.FC<YantrikaLandingPageProps> = ({ onStar
                   </button>
                   <button
                     onClick={() => { setMobileMenuOpen(false); if (onOpenApp) onOpenApp(); else onStartBuilding(); }}
-                    className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl bg-text text-white text-sm font-medium"
+                    className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-hover transition-all shadow-[0_2px_8px_rgba(244,122,32,0.25)]"
                   >
                     Launch App <ArrowRight size={14} />
                   </button>
