@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
 import { useAgentStore } from './store/agentStore';
 import { useAgentStream } from './hooks/useAgentStream';
@@ -244,130 +245,182 @@ function App() {
         </header>
 
         {/* ─── Workspace Content ─── */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Dashboard */}
-          {workspaceMode === 'dashboard' && (
-            <WorkspaceDashboard
-              onOpenBuilder={() => setWorkspaceMode('builder')}
-              onOpenIDE={() => setWorkspaceMode('ide')}
-            />
-          )}
+        <div className="flex-1 flex overflow-hidden relative">
+          <AnimatePresence mode="wait">
+            {workspaceMode === 'dashboard' && (
+              <motion.div
+                key="dashboard"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="w-full h-full absolute inset-0"
+              >
+                <WorkspaceDashboard
+                  onOpenBuilder={() => setWorkspaceMode('builder')}
+                  onOpenIDE={() => setWorkspaceMode('ide')}
+                />
+              </motion.div>
+            )}
 
-          {/* Projects — reuses SessionSidebar + Dashboard for session list */}
-          {workspaceMode === 'projects' && (
-            <div className="flex-1 flex overflow-hidden">
-              <div className="w-64 border-r border-border bg-surface shrink-0">
-                <SessionSidebar />
-              </div>
-              <WorkspaceDashboard
-                onOpenBuilder={() => setWorkspaceMode('builder')}
-                onOpenIDE={() => setWorkspaceMode('ide')}
-              />
-            </div>
-          )}
-
-          {/* Builder */}
-          {workspaceMode === 'builder' && (
-            <div className="flex-1 flex overflow-hidden bg-background">
-              <div className="border-r border-border bg-surface">
-                <SessionSidebar />
-              </div>
-              <div className="flex-1 flex flex-col h-full max-w-4xl mx-auto border-x border-border bg-surface shadow-xl w-full">
-                <Chat />
-              </div>
-            </div>
-          )}
-
-          {/* Workspace (IDE) */}
-          {workspaceMode === 'ide' && (
-            <div className="flex-1 flex flex-col bg-background overflow-hidden">
-              <SandboxPanel />
-              <PanelGroup direction="vertical" className="flex-1">
-                <Panel defaultSize={showTerminal ? 75 : 100} minSize={40}>
-                  <PanelGroup direction="horizontal" className="h-full">
-                    {showFileExplorer && (
-                      <>
-                        <Panel defaultSize={18} minSize={12} maxSize={28}>
-                          <div className="h-full border-r border-[#E9DED2]/20 bg-white">
-                            <FileBrowser />
-                          </div>
-                        </Panel>
-                        <PanelResizeHandle className="resize-handle-horizontal" />
-                      </>
-                    )}
-                    <Panel defaultSize={showFileExplorer ? 82 : 100} minSize={50}>
-                      <div className="h-full bg-[#12141a]">
-                        <CodeEditor />
-                      </div>
-                    </Panel>
-                  </PanelGroup>
-                </Panel>
-                {showTerminal && (
-                  <>
-                    <PanelResizeHandle className="resize-handle-vertical" />
-                    <Panel defaultSize={25} minSize={12} maxSize={60}>
-                      <div className="h-full border-t border-[#E9DED2]/20 bg-white">
-                        <TerminalLog />
-                      </div>
-                    </Panel>
-                  </>
-                )}
-              </PanelGroup>
-            </div>
-          )}
-
-          {/* Preview */}
-          {workspaceMode === 'preview' && (
-            <div className="flex-1 h-full w-full">
-              <BrowserPreview />
-            </div>
-          )}
-
-          {/* Debug */}
-          {workspaceMode === 'debug' && (
-            <div className="flex-1 h-full w-full">
-              <WorkspaceDebug />
-            </div>
-          )}
-
-          {/* Integrations */}
-          {workspaceMode === 'integrations' && (
-            <div className="flex-1 h-full w-full">
-              <IntegrationsPage />
-            </div>
-          )}
-
-          {/* System Administration */}
-          {workspaceMode === 'system' && (
-            <div className="flex-1 flex flex-col bg-warm-gradient overflow-hidden">
-              <div className="h-10 border-b border-[#E9DED2] bg-white px-4 flex items-center justify-between shrink-0 text-xs">
-                <span className="font-bold text-[#1F2937]">System Administration</span>
-                <div className="flex items-center bg-[#FAF8F4] border border-[#E9DED2] rounded-lg p-0.5">
-                  <button
-                    onClick={() => setSystemSubTab('architecture')}
-                    className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-md transition-all ${
-                      systemSubTab === 'architecture' ? 'bg-[#F47A20] text-white font-semibold' : 'text-[#6B7280] hover:text-[#1F2937]'
-                    }`}
-                  >
-                    <LayoutGrid size={12} />
-                    Architecture Map
-                  </button>
-                  <button
-                    onClick={() => setSystemSubTab('observability')}
-                    className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-md transition-all ${
-                      systemSubTab === 'observability' ? 'bg-[#F47A20] text-white font-semibold' : 'text-[#6B7280] hover:text-[#1F2937]'
-                    }`}
-                  >
-                    <BarChart2 size={12} />
-                    AI Observability
-                  </button>
+            {workspaceMode === 'projects' && (
+              <motion.div
+                key="projects"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="w-full h-full absolute inset-0 flex overflow-hidden"
+              >
+                <div className="w-64 border-r border-border bg-surface/50 backdrop-blur-md shrink-0">
+                  <SessionSidebar />
                 </div>
-              </div>
-              <div className="flex-1 overflow-hidden">
-                {systemSubTab === 'architecture' ? <ArchitectureView /> : <ObservabilityDashboard />}
-              </div>
-            </div>
-          )}
+                <WorkspaceDashboard
+                  onOpenBuilder={() => setWorkspaceMode('builder')}
+                  onOpenIDE={() => setWorkspaceMode('ide')}
+                />
+              </motion.div>
+            )}
+
+            {workspaceMode === 'builder' && (
+              <motion.div
+                key="builder"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="w-full h-full absolute inset-0 flex overflow-hidden bg-background"
+              >
+                <div className="border-r border-border bg-surface/50 backdrop-blur-md z-10">
+                  <SessionSidebar />
+                </div>
+                <div className="flex-1 flex flex-col h-full max-w-4xl mx-auto border-x border-border/40 bg-surface/80 shadow-2xl w-full backdrop-blur-xl">
+                  <Chat />
+                </div>
+              </motion.div>
+            )}
+
+            {workspaceMode === 'ide' && (
+              <motion.div
+                key="ide"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="w-full h-full absolute inset-0 flex flex-col bg-background overflow-hidden"
+              >
+                <SandboxPanel />
+                <PanelGroup direction="vertical" className="flex-1">
+                  <Panel defaultSize={showTerminal ? 75 : 100} minSize={40}>
+                    <PanelGroup direction="horizontal" className="h-full">
+                      {showFileExplorer && (
+                        <>
+                          <Panel defaultSize={18} minSize={12} maxSize={28}>
+                            <div className="h-full border-r border-border/40 bg-[#0E0E0E]">
+                              <FileBrowser />
+                            </div>
+                          </Panel>
+                          <PanelResizeHandle className="resize-handle-horizontal" />
+                        </>
+                      )}
+                      <Panel defaultSize={showFileExplorer ? 82 : 100} minSize={50}>
+                        <div className="h-full bg-[#141414]">
+                          <CodeEditor />
+                        </div>
+                      </Panel>
+                    </PanelGroup>
+                  </Panel>
+                  {showTerminal && (
+                    <>
+                      <PanelResizeHandle className="resize-handle-vertical" />
+                      <Panel defaultSize={25} minSize={12} maxSize={60}>
+                        <div className="h-full border-t border-border/40 bg-[#0E0E0E]">
+                          <TerminalLog />
+                        </div>
+                      </Panel>
+                    </>
+                  )}
+                </PanelGroup>
+              </motion.div>
+            )}
+
+            {workspaceMode === 'preview' && (
+              <motion.div
+                key="preview"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="w-full h-full absolute inset-0"
+              >
+                <BrowserPreview />
+              </motion.div>
+            )}
+
+            {workspaceMode === 'debug' && (
+              <motion.div
+                key="debug"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="w-full h-full absolute inset-0"
+              >
+                <WorkspaceDebug />
+              </motion.div>
+            )}
+
+            {workspaceMode === 'integrations' && (
+              <motion.div
+                key="integrations"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="w-full h-full absolute inset-0"
+              >
+                <IntegrationsPage />
+              </motion.div>
+            )}
+
+            {workspaceMode === 'system' && (
+              <motion.div
+                key="system"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="w-full h-full absolute inset-0 flex flex-col bg-surface/30 overflow-hidden"
+              >
+                <div className="h-10 border-b border-border/40 bg-surface/80 backdrop-blur-md px-4 flex items-center justify-between shrink-0 text-xs z-10">
+                  <span className="font-bold text-text">System Administration</span>
+                  <div className="flex items-center bg-background border border-border rounded-lg p-0.5">
+                    <button
+                      onClick={() => setSystemSubTab('architecture')}
+                      className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-md transition-all ${
+                        systemSubTab === 'architecture' ? 'bg-brand text-white font-semibold shadow-sm' : 'text-text-muted hover:text-text'
+                      }`}
+                    >
+                      <LayoutGrid size={12} />
+                      Architecture Map
+                    </button>
+                    <button
+                      onClick={() => setSystemSubTab('observability')}
+                      className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-md transition-all ${
+                        systemSubTab === 'observability' ? 'bg-brand text-white font-semibold shadow-sm' : 'text-text-muted hover:text-text'
+                      }`}
+                    >
+                      <BarChart2 size={12} />
+                      AI Observability
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  {systemSubTab === 'architecture' ? <ArchitectureView /> : <ObservabilityDashboard />}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 

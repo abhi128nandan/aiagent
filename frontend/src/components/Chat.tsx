@@ -24,21 +24,21 @@ const ActionCard: React.FC<ActionCardProps> = ({ type, title, detail, content })
     };
 
     return (
-        <div className="border border-border/80 bg-surface rounded-xl overflow-hidden my-2 shadow-xs w-full max-w-full text-xs">
+        <div className="glass-panel border border-border/60 rounded-xl overflow-hidden my-2 shadow-sm w-full max-w-full text-xs transition-all duration-300">
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-surface-hover transition-colors font-medium text-xs"
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-surface-hover/50 transition-colors font-medium text-xs"
             >
                 {iconMap[type]}
                 <span className="flex-1 text-text truncate font-mono text-[11px]">{title}</span>
-                {detail && <span className="text-[10px] text-text-muted bg-background px-2 py-0.5 rounded-md border border-border shrink-0">{detail}</span>}
+                {detail && <span className="text-[10px] text-text-muted bg-background/50 backdrop-blur-sm px-2 py-0.5 rounded-md border border-border shrink-0 shadow-xs">{detail}</span>}
                 {content && (
                     isOpen ? <ChevronUp size={12} className="text-text-muted shrink-0" /> : <ChevronDown size={12} className="text-text-muted shrink-0" />
                 )}
             </button>
             {isOpen && content && (
-                <div className="border-t border-border bg-[#151722] p-3 font-mono text-[11px] leading-relaxed max-h-[240px] overflow-y-auto text-slate-200">
+                <div className="border-t border-border bg-[#0C0C0C]/80 backdrop-blur-md p-3 font-mono text-[11px] leading-relaxed max-h-[240px] overflow-y-auto text-slate-300 shadow-inner">
                     <pre className="whitespace-pre-wrap">{content.trim()}</pre>
                 </div>
             )}
@@ -199,12 +199,12 @@ export const Chat: React.FC = () => {
 
                 {messages.map((msg, i) => (
                     <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[88%] rounded-2xl p-3.5 text-xs sm:text-sm shadow-xs ${
+                        <div className={`max-w-[88%] rounded-2xl p-3.5 text-xs sm:text-sm shadow-sm transition-all ${
                             msg.role === 'user' 
-                                ? 'bg-brand text-white rounded-br-none font-medium' 
+                                ? 'bg-gradient-to-br from-brand to-brand-hover text-white rounded-br-none font-medium shadow-[0_4px_16px_rgba(244,122,32,0.3)]' 
                                 : msg.role === 'system'
-                                ? 'bg-amber-500/10 border border-amber-500/20 text-amber-900 rounded-bl-none w-full'
-                                : 'bg-background border border-border text-text rounded-bl-none w-full'
+                                ? 'bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-bl-none w-full'
+                                : 'glass-panel rounded-bl-none w-full'
                         }`}>
                             {msg.role === 'system' ? (
                                 <div className="space-y-1 w-full whitespace-pre-wrap font-sans text-xs">
@@ -277,7 +277,7 @@ export const Chat: React.FC = () => {
             </div>
 
             {/* Input & Form */}
-            <form onSubmit={handleSubmit} className="p-3 border-t border-border bg-surface space-y-2 shrink-0">
+            <form onSubmit={handleSubmit} className="p-3 border-t border-border/40 bg-surface/60 backdrop-blur-xl space-y-2 shrink-0 z-10 shadow-[0_-8px_32px_rgba(0,0,0,0.15)] relative">
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center bg-background border border-border rounded-xl p-0.5 text-xs">
                         <button
@@ -314,7 +314,7 @@ export const Chat: React.FC = () => {
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         placeholder={chatMode === 'discuss' ? "Ask a question about the project (Discuss)..." : "Describe what to build or fix..."}
-                        className="w-full bg-background border border-border rounded-2xl pl-4 pr-12 py-3 text-xs sm:text-sm focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 text-text transition-all shadow-inner"
+                        className="w-full bg-background/50 backdrop-blur-md border border-border/60 rounded-2xl pl-4 pr-12 py-3 text-xs sm:text-sm focus:outline-none focus:border-brand focus:ring-4 focus:ring-brand/15 text-text transition-all prompt-input-shadow placeholder:text-text-muted"
                     />
                     {isRunning ? (
                         <button 
