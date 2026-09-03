@@ -49,6 +49,7 @@ function App() {
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('dashboard');
   const [systemSubTab, setSystemSubTab] = useState<'architecture' | 'observability'>('architecture');
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
+  const [pendingPrompt, setPendingPrompt] = useState<string>('');
 
   // IDE view internal panel states
   const [showFileExplorer, setShowFileExplorer] = useState(true);
@@ -76,7 +77,7 @@ function App() {
     if (status === 'planning') {
       return { dot: 'bg-amber-500 animate-pulse', label: 'Planning', bg: 'bg-amber-500/10 border-amber-500/20 text-amber-600' };
     }
-    if (status.startsWith('running') || connectionState === 'open') {
+    if (status.startsWith('running')) {
       return { dot: 'bg-emerald-500 animate-ping', label: 'Running', bg: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' };
     }
     return { dot: 'bg-slate-400', label: 'Idle', bg: 'bg-slate-100 border-slate-200 text-slate-600' };
@@ -100,15 +101,17 @@ function App() {
     return (
       <div className="h-screen w-screen overflow-y-auto">
         <YantrikaLandingPage
-          onStartBuilding={() => {
+          onStartBuilding={(prompt?: string) => {
             window.scrollTo({ top: 0, behavior: 'instant' });
+            if (prompt) setPendingPrompt(prompt);
             setAppView('app');
             setWorkspaceMode('builder');
           }}
           onOpenApp={(mode?: string) => {
             window.scrollTo({ top: 0, behavior: 'instant' });
             setAppView('app');
-            if (mode) {
+            const validModes = ['dashboard', 'projects', 'builder', 'ide', 'preview', 'debug', 'integrations', 'system'];
+            if (mode && validModes.includes(mode.toLowerCase())) {
               setWorkspaceMode(mode.toLowerCase() as WorkspaceMode);
             } else {
               setWorkspaceMode('dashboard');
@@ -295,7 +298,7 @@ function App() {
                   <SessionSidebar />
                 </div>
                 <div className="flex-1 flex flex-col h-full max-w-4xl mx-auto border-x border-border/40 bg-surface/80 shadow-2xl w-full backdrop-blur-xl">
-                  <Chat />
+                  <Chat initialPrompt={pendingPrompt} onPromptSent={() => setPendingPrompt('')} />
                 </div>
               </motion.div>
             )}

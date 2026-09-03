@@ -94,7 +94,12 @@ const parseMessageContent = (text: string) => {
     return parts;
 };
 
-export const Chat: React.FC = () => {
+interface ChatProps {
+    initialPrompt?: string;
+    onPromptSent?: () => void;
+}
+
+export const Chat: React.FC<ChatProps> = ({ initialPrompt = '', onPromptSent }) => {
     const {
         activeSessionId,
         messagesBySession,
@@ -107,7 +112,7 @@ export const Chat: React.FC = () => {
     } = useAgentStore();
     const chatMode = chatModeBySession[activeSessionId] || 'build';
     const { send, resume, stop } = useAgentStream();
-    const [input, setInput] = useState('');
+    const [input, setInput] = useState(initialPrompt);
     const endRef = useRef<HTMLDivElement>(null);
     const messages = messagesBySession[activeSessionId] || [];
     const pending = pendingBySession[activeSessionId] || [];
@@ -127,6 +132,7 @@ export const Chat: React.FC = () => {
                 : input.trim();
             send(fullMessage);
             setInput('');
+            if (onPromptSent) onPromptSent();
         }
     };
 

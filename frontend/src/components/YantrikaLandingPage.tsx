@@ -15,7 +15,7 @@ import {
 import { FaJava, FaAws, FaMicrosoft } from 'react-icons/fa';
 
 interface YantrikaLandingPageProps {
-  onStartBuilding: () => void;
+  onStartBuilding: (prompt?: string) => void;
   onOpenApp?: (mode?: string) => void;
 }
 
@@ -129,7 +129,7 @@ export const YantrikaLandingPage: React.FC<YantrikaLandingPageProps> = ({ onStar
       <BoltStyleChat
         onSend={(msg) => {
           console.log('Agent prompt:', msg);
-          onStartBuilding();
+          onStartBuilding(msg);
         }}
       />
 
@@ -221,7 +221,7 @@ export const YantrikaLandingPage: React.FC<YantrikaLandingPageProps> = ({ onStar
             className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
           >
             <button
-              onClick={onStartBuilding}
+              onClick={() => onStartBuilding()}
               className="h-12 px-8 inline-flex items-center gap-2 rounded-xl bg-text text-white font-semibold text-sm hover:bg-text/90 transition-colors shadow-sm"
             >
               Start Building — Free <ArrowRight size={16} />

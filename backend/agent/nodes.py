@@ -3190,7 +3190,7 @@ async def validate_structural_check(state: AgentState) -> AgentState:
         runtime = DockerRuntime.get(session_id)
         if runtime:
             res = await runtime.execute(CmdRunAction(
-                command="find /workspace -maxdepth 3 \( -name '*test-report*.*' -o -name '*junit*.*' -o -name '*coverage*.*' -o -name 'package.json' -o -name 'pytest.ini' -o -name 'pyproject.toml' -o -name 'requirements.txt' \) 2>/dev/null | head -n 1"
+                command=r"find /workspace -maxdepth 3 \( -name '*test-report*.*' -o -name '*junit*.*' -o -name '*coverage*.*' -o -name 'package.json' -o -name 'pytest.ini' -o -name 'pyproject.toml' -o -name 'requirements.txt' \) 2>/dev/null | head -n 1"
             ))
             output = res.get('output', '').strip()
             if res.get('exit_code') != 0 or not output:
