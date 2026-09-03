@@ -487,9 +487,12 @@ async def websocket_endpoint(ws: WebSocket):
         )
         
         if graph_task in done:
-            exc = graph_task.exception()
-            if exc:
-                raise exc
+            try:
+                exc = graph_task.exception()
+                if exc:
+                    raise exc
+            except asyncio.CancelledError:
+                pass
             # Graph finished normally, keep connection open until client disconnects
             await receive_task
 

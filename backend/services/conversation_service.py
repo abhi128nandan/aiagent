@@ -151,6 +151,27 @@ class ConversationService:
                 _memory_conversations[conversation_id]["status"] = status
             return _memory_conversations.get(conversation_id)
 
+    def _ensure_table(self, conn: psycopg.Connection) -> None:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS conversations (
+                id UUID PRIMARY KEY,
+                status TEXT NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            )
+            """
+        )
+        conn.commit()
+
+    def _row_to_conversation(self, row: tuple) -> dict[str, Any]:
+        return {
+            "id": str(row[0]),
+            "status": row[1],
+            "created_at": row[2].isoformat() if row[2] else None,
+            "updated_at": row[3].isoformat() if row[3] else None,
+        }
+
     def _ensure_events_table(self, conn: psycopg.Connection) -> None:
         conn.execute(
             """
