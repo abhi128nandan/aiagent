@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, getWebSocketUrl } from '../api/backend';
 import { queryKeys } from '../api/queryKeys';
@@ -37,6 +37,7 @@ export function useAgentStream() {
     const retryCount = useRef(0);
     const reconnectTimer = useRef<number | null>(null);
     const lastSeq = useRef<Record<string, number>>({});
+    const openAndSendRef = useRef<(message: string, sessionId: string, action?: 'start' | 'resume') => void>(() => {});
 
     const refreshSandbox = useCallback(async (sessionId: string) => {
         const store = useAgentStore.getState();
@@ -214,6 +215,7 @@ export function useAgentStream() {
         }
 
         if (event.type === 'interactive_waiting') {
+            // eslint-disable-next-line no-control-regex
             const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '').trim();
             const promptText = stripAnsi((event as any).prompt || '');
             const contextText = stripAnsi((event as any).context || '');
@@ -474,7 +476,7 @@ export function useAgentStream() {
                 retryCount.current += 1;
                 const delay = Math.min(1000 * (2 ** (retryCount.current - 1)), 30000);
                 logAgentEvent(`> WebSocket closed unexpectedly. Reconnecting in ${Math.round(delay / 1000)}s...`, sessionId);
-                reconnectTimer.current = window.setTimeout(() => openAndSend(message, sessionId, action), delay);
+                reconnectTimer.current = window.setTimeout(() => openAndSendRef.current(message, sessionId, action), delay);
                 if (retryCount.current > 6) {
                     store.queuePending(message, sessionId);
                     store.setError('Message queued. Reconnect or send again when backend is ready.');
@@ -491,6 +493,10 @@ export function useAgentStream() {
             }
         };
     }, [handleEvent]);
+
+    useEffect(() => {
+        openAndSendRef.current = openAndSend;
+    }, [openAndSend]);
 
     const send = useCallback((message: string) => {
         const store = useAgentStore.getState();

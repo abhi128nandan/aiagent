@@ -28,7 +28,20 @@ export const SandboxManagerModal: React.FC<SandboxManagerModalProps> = ({ onClos
     };
 
     useEffect(() => {
-        fetchSandboxes();
+        let isCurrent = true;
+        api.sandbox.listAll()
+            .then(data => {
+                if (isCurrent) setSandboxes(data.sandboxes);
+            })
+            .catch(error => {
+                console.error('Failed to fetch sandboxes:', error);
+            })
+            .finally(() => {
+                if (isCurrent) setLoading(false);
+            });
+        return () => {
+            isCurrent = false;
+        };
     }, []);
 
     const handleDelete = async (sessionId: string) => {

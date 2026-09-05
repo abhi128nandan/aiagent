@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { useAgentStore } from '../store/agentStore';
@@ -65,7 +65,7 @@ const AgentTerminal: React.FC<{ xtermRef: React.MutableRefObject<XTerm | null> }
         term.writeln('');
 
         const resizeObserver = new ResizeObserver(() => {
-            try { fitAddon.fit(); } catch {}
+            try { fitAddon.fit(); } catch { /* ignore */ }
         });
         resizeObserver.observe(termRef.current);
 
@@ -166,7 +166,7 @@ const AppLogsTerminal: React.FC<{ xtermRef: React.MutableRefObject<XTerm | null>
         term.writeln('');
 
         const resizeObserver = new ResizeObserver(() => {
-            try { fitAddon.fit(); } catch {}
+            try { fitAddon.fit(); } catch { /* ignore */ }
         });
         resizeObserver.observe(termRef.current);
 
@@ -316,7 +316,9 @@ const UserTerminal: React.FC = () => {
                         }));
                     }
                 }
-            } catch {}
+            } catch {
+                /* ignore */
+            }
         });
         resizeObserver.observe(termRef.current);
 
@@ -493,8 +495,20 @@ export const TerminalLog: React.FC = () => {
         }
     });
     const [historyIndex, setHistoryIndex] = useState(-1);
-    const [suggestions, setSuggestions] = useState<string[]>([]);
+    const [dismissedInput, setDismissedInput] = useState<string | null>(null);
+    const suggestions = useMemo(() => {
+        const val = inputValue.trim();
+        if (!val || dismissedInput === val) return [];
+        return SUGGESTIONS.filter(
+            s => s.toLowerCase().startsWith(val.toLowerCase()) && s.toLowerCase() !== val.toLowerCase()
+        );
+    }, [inputValue, dismissedInput]);
     const [activeSuggestionIdx, setActiveSuggestionIdx] = useState(0);
+    const [prevInputForSuggestions, setPrevInputForSuggestions] = useState(inputValue);
+    if (inputValue !== prevInputForSuggestions) {
+        setPrevInputForSuggestions(inputValue);
+        setActiveSuggestionIdx(0);
+    }
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     // Process & Task control details
@@ -506,6 +520,11 @@ export const TerminalLog: React.FC = () => {
     const foregroundProcess = foregroundProcessBySession[activeSessionId] || null;
 
     const [runtimeDuration, setRuntimeDuration] = useState(0);
+    const [prevCommandStart, setPrevCommandStart] = useState(activeCommandStart);
+    if (activeCommandStart !== prevCommandStart) {
+        setPrevCommandStart(activeCommandStart);
+        setRuntimeDuration(0);
+    }
     const [processesPanelOpen, setProcessesPanelOpen] = useState(false);
     
     // Safety modals state
@@ -525,10 +544,7 @@ export const TerminalLog: React.FC = () => {
 
     // Tick runtime duration
     useEffect(() => {
-        if (!activeCommandStart) {
-            setRuntimeDuration(0);
-            return;
-        }
+        if (!activeCommandStart) return;
         const interval = setInterval(() => {
             const elapsed = Math.round((Date.now() - activeCommandStart) / 1000);
             setRuntimeDuration(elapsed);
@@ -545,7 +561,9 @@ export const TerminalLog: React.FC = () => {
         setHistoryIndex(-1);
         try {
             localStorage.setItem('myaiagent.cmd_history', JSON.stringify(next));
-        } catch {}
+        } catch {
+            /* ignore */
+        }
     };
 
     // Auto-switch to Agent Terminal when agent is waiting for input
@@ -554,7 +572,7 @@ export const TerminalLog: React.FC = () => {
             setActiveTab('agent');
         }
         prevWaiting.current = isWaiting;
-    }, [isWaiting]);
+    }, [isWaiting, setActiveTab]);
 
     // Auto-switch to App Logs on first output
     useEffect(() => {
@@ -564,7 +582,7 @@ export const TerminalLog: React.FC = () => {
             }
         }
         prevAppLogsLen.current = appLogs.length;
-    }, [appLogs, activeTab]);
+    }, [appLogs, activeTab, setActiveTab]);
 
     // Resize textarea on content change
     useEffect(() => {
@@ -572,20 +590,6 @@ export const TerminalLog: React.FC = () => {
         if (!textarea) return;
         textarea.style.height = 'auto';
         textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
-    }, [inputValue]);
-
-    // Stdin suggestions handler
-    useEffect(() => {
-        const val = inputValue.trim();
-        if (!val) {
-            setSuggestions([]);
-            return;
-        }
-        const filtered = SUGGESTIONS.filter(
-            s => s.toLowerCase().startsWith(val.toLowerCase()) && s.toLowerCase() !== val.toLowerCase()
-        );
-        setSuggestions(filtered);
-        setActiveSuggestionIdx(0);
     }, [inputValue]);
 
     const handleCopySelection = () => {
@@ -610,7 +614,7 @@ export const TerminalLog: React.FC = () => {
             appendInteractiveOutput(`\x1b[36m⌨ sent:\x1b[0m ${cleanVal || '⏎'}\r\n`, activeSessionId);
             addToHistory(cleanVal);
             setInputValue('');
-            setSuggestions([]);
+            setDismissedInput(null);
         } else {
             appendInteractiveOutput('\x1b[31m✗ No active agent connection — input not sent.\x1b[0m\r\n', activeSessionId);
         }
@@ -676,15 +680,16 @@ export const TerminalLog: React.FC = () => {
         if (e.key === 'Escape') {
             e.preventDefault();
             setInputValue('');
-            setSuggestions([]);
+            setDismissedInput(null);
             return;
         }
 
         // Tab -> Autocomplete suggestion
         if (e.key === 'Tab' && suggestions.length > 0) {
             e.preventDefault();
-            setInputValue(suggestions[activeSuggestionIdx]);
-            setSuggestions([]);
+            const chosen = suggestions[activeSuggestionIdx];
+            setInputValue(chosen);
+            setDismissedInput(chosen.trim());
             return;
         }
 
@@ -1129,7 +1134,7 @@ export const TerminalLog: React.FC = () => {
                                         key={sug}
                                         onClick={() => {
                                             setInputValue(sug);
-                                            setSuggestions([]);
+                                            setDismissedInput(sug.trim());
                                         }}
                                         className={`w-full text-left px-2.5 py-1 text-xs font-mono rounded-lg transition-colors flex items-center justify-between ${
                                             idx === activeSuggestionIdx

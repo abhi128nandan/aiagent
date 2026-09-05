@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Editor } from '@monaco-editor/react';
+import { Editor, type OnMount } from '@monaco-editor/react';
 import { useAgentStore } from '../store/agentStore';
 import { api } from '../api/backend';
 import { Save, Loader2, Lock, Unlock, X, FileCode2, ChevronRight, Sparkles } from 'lucide-react';
@@ -27,7 +27,7 @@ export const CodeEditor: React.FC = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
     const [openTabs, setOpenTabs] = useState<string[]>([]);
-    const editorRef = React.useRef<any>(null);
+    const editorRef = React.useRef<Parameters<OnMount>[0] | null>(null);
 
     // Get files for current session
     const files = filesBySession[activeSessionId] || {};
@@ -42,14 +42,20 @@ export const CodeEditor: React.FC = () => {
 
     const content = activeFile ? files[activeFile] || '' : '';
     const contentRef = React.useRef(content);
-    contentRef.current = content;
+    const [prevActiveFile, setPrevActiveFile] = useState<string | null>(activeFile);
 
-    // Track active file additions to tabs
-    useEffect(() => {
+    // Sync tabs and dirty state on active file change during render
+    if (activeFile !== prevActiveFile) {
+        setPrevActiveFile(activeFile);
         if (activeFile && !openTabs.includes(activeFile)) {
             setOpenTabs(prev => [...prev, activeFile]);
         }
-    }, [activeFile, openTabs]);
+        setIsDirty(false);
+    }
+
+    useEffect(() => {
+        contentRef.current = content;
+    }, [content]);
 
     const handleCloseTab = (e: React.MouseEvent, path: string) => {
         e.stopPropagation();
@@ -77,12 +83,9 @@ export const CodeEditor: React.FC = () => {
     }, [activeFile, activeSessionId, isSaving, addLog]);
 
     const handleSaveRef = React.useRef(handleSave);
-    handleSaveRef.current = handleSave;
-
-    // Reset dirty state on active file change
     useEffect(() => {
-        setIsDirty(false);
-    }, [activeFile]);
+        handleSaveRef.current = handleSave;
+    }, [handleSave]);
 
     // Auto-scroll during streaming
     useEffect(() => {
@@ -126,7 +129,7 @@ export const CodeEditor: React.FC = () => {
     const lang = langMap[ext] || 'plaintext';
     const breadcrumbPath = activeFile.split('/');
 
-    const handleEditorDidMount = (editor: any, monaco: any) => {
+    const handleEditorDidMount: OnMount = (editor, monaco) => {
         editorRef.current = editor;
         editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
             handleSaveRef.current?.();

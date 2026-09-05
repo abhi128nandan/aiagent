@@ -16,15 +16,13 @@ export const HoverCard: React.FC<HoverCardProps> = ({
   tiltMaxAngleY = 6,
   ...props
 }) => {
-  // We use simple Framer Motion whileHover for the lift and scale.
-  // Full 3D mouse tracking tilt can be heavy, so we use a CSS-based approach for performance if needed,
-  // but framer-motion is fine for the core interactions required.
-
   return (
     <motion.div
       whileHover={{ 
         y: -6, 
-        scale: 1.01,
+        rotateX: tiltMaxAngleX ? 1.5 : 0,
+        rotateY: tiltMaxAngleY ? 1.5 : 0,
+        scale: 1.01, 
         transition: { duration: 0.25, ease: "easeOut" }
       }}
       className={`relative bg-white border border-[#E9DED2] rounded-[20px] shadow-sm hover:shadow-xl hover:border-[#F47A20]/40 transition-shadow duration-300 group overflow-hidden ${className}`}

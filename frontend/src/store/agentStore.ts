@@ -61,9 +61,30 @@ const createSession = (): AgentSession => {
     };
 };
 
+const getStorageItem = (key: string): string | null => {
+    try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+            return window.localStorage.getItem(key);
+        }
+    } catch {
+        // Storage access restricted or disabled
+    }
+    return null;
+};
+
+const setStorageItem = (key: string, value: string): void => {
+    try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.setItem(key, value);
+        }
+    } catch {
+        // Storage access restricted or quota exceeded
+    }
+};
+
 const loadSessions = () => {
     try {
-        const raw = localStorage.getItem(SESSIONS_KEY);
+        const raw = getStorageItem(SESSIONS_KEY);
         const parsed = raw ? JSON.parse(raw) as AgentSession[] : [];
         return parsed.length ? parsed : [createSession()];
     } catch {
@@ -73,11 +94,11 @@ const loadSessions = () => {
 
 const initialSessions = loadSessions();
 const initialActiveSessionId =
-    localStorage.getItem(ACTIVE_SESSION_KEY) || initialSessions[0].id;
+    getStorageItem(ACTIVE_SESSION_KEY) || initialSessions[0].id;
 
 const persistSessions = (sessions: AgentSession[], activeSessionId: string) => {
-    localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
-    localStorage.setItem(ACTIVE_SESSION_KEY, activeSessionId);
+    setStorageItem(SESSIONS_KEY, JSON.stringify(sessions));
+    setStorageItem(ACTIVE_SESSION_KEY, activeSessionId);
 };
 
 interface AgentStore {

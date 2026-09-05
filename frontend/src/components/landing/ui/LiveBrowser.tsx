@@ -18,7 +18,7 @@ export const LiveBrowser: React.FC<{ className?: string }> = ({ className = '' }
       { time: 7000, stage: 0 }, // Reset loop
     ];
     
-    let timeouts = sequence.map(s => setTimeout(() => setStage(s.stage), s.time));
+    const timeouts = sequence.map(s => setTimeout(() => setStage(s.stage), s.time));
     return () => timeouts.forEach(clearTimeout);
   }, [stage]);
 

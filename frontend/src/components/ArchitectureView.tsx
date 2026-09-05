@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { RefreshCw, LayoutGrid, Layers, CheckCircle, Activity, Network, FileText, Calendar, ChevronRight, GitBranch, Server, GitCommit, HelpCircle, AlertCircle } from 'lucide-react';
 import { useAgentStore } from '../store/agentStore';
 import { ReactFlow, Background, Controls, type Node, type Edge, Position } from '@xyflow/react';
@@ -26,7 +26,7 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'TB') => 
 
   const newNodes = nodes.map((node) => {
     const nodeWithPosition = dagreGraph.node(node.id);
-    const newNode = {
+    const newNode: Node = {
       ...node,
       targetPosition: isHorizontal ? Position.Left : Position.Top,
       sourcePosition: isHorizontal ? Position.Right : Position.Bottom,
@@ -41,54 +41,61 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'TB') => 
   return { nodes: newNodes, edges };
 };
 
+interface ChartDataNode {
+  id: string;
+  data?: { label?: string };
+}
+
+interface ChartDataEdge {
+  id?: string;
+  source: string;
+  target: string;
+}
+
 interface FlowRendererProps {
-  chartData: any; // { nodes: any[], edges: any[] }
+  chartData: { nodes?: ChartDataNode[]; edges?: ChartDataEdge[] } | null;
   direction?: 'TB' | 'LR';
 }
 
 export const FlowRenderer: React.FC<FlowRendererProps> = ({ chartData, direction = 'TB' }) => {
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [edges, setEdges] = useState<Edge[]>([]);
-
-  useEffect(() => {
-    if (chartData && chartData.nodes && chartData.edges) {
-      const initialNodes: Node[] = chartData.nodes.map((n: any) => ({
-        id: n.id,
-        data: { label: n.data?.label || n.id },
-        position: { x: 0, y: 0 },
-        type: 'default',
-        style: { 
-            background: '#1e1b4b', 
-            color: '#f8fafc', 
-            border: '1px solid #4f46e5',
-            borderRadius: '8px',
-            padding: '10px',
-            fontSize: '12px',
-            width: 150,
-            textAlign: 'center',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-        }
-      }));
-
-      const initialEdges: Edge[] = chartData.edges.map((e: any) => ({
-        id: e.id || `e-${e.source}-${e.target}`,
-        source: e.source,
-        target: e.target,
-        animated: true,
-        style: { stroke: '#64748b' }
-      }));
-
-      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
-        initialNodes,
-        initialEdges,
-        direction
-      );
-
-      setNodes(layoutedNodes);
-      setEdges(layoutedEdges);
+  const { nodes, edges } = useMemo(() => {
+    if (!chartData?.nodes || !chartData?.edges) {
+      return { nodes: [], edges: [] };
     }
+
+    const initialNodes: Node[] = chartData.nodes.map((n) => ({
+      id: n.id,
+      data: { label: n.data?.label || n.id },
+      position: { x: 0, y: 0 },
+      type: 'default',
+      style: { 
+          background: '#1e1b4b', 
+          color: '#f8fafc', 
+          border: '1px solid #4f46e5',
+          borderRadius: '8px',
+          padding: '10px',
+          fontSize: '12px',
+          width: 150,
+          textAlign: 'center',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+      }
+    }));
+
+    const initialEdges: Edge[] = chartData.edges.map((e) => ({
+      id: e.id || `e-${e.source}-${e.target}`,
+      source: e.source,
+      target: e.target,
+      animated: true,
+      style: { stroke: '#64748b' }
+    }));
+
+    return getLayoutedElements(
+      initialNodes,
+      initialEdges,
+      direction
+    );
   }, [chartData, direction]);
 
   if (!chartData || !chartData.nodes || chartData.nodes.length === 0) {
@@ -128,10 +135,18 @@ export const ArchitectureView: React.FC = () => {
     const plan = activeSessionId ? architecturalPlanBySession[activeSessionId] : null;
 
     useEffect(() => {
+        let isCurrent = true;
         if (activeSessionId) {
-            setLoading(true);
-            fetchArchitecturalPlan(activeSessionId).finally(() => setLoading(false));
+            Promise.resolve().then(() => {
+                if (isCurrent) setLoading(true);
+            });
+            fetchArchitecturalPlan(activeSessionId).finally(() => {
+                if (isCurrent) setLoading(false);
+            });
         }
+        return () => {
+            isCurrent = false;
+        };
     }, [activeSessionId, fetchArchitecturalPlan]);
 
     const handleRefresh = () => {

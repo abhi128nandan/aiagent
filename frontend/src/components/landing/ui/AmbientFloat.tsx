@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useSyncExternalStore } from 'react';
 import { motion } from 'framer-motion';
+
+const emptySubscribe = () => () => {};
 
 export const AmbientFloat: React.FC<{
   children: React.ReactNode;
@@ -7,11 +9,7 @@ export const AmbientFloat: React.FC<{
   duration?: number;
   className?: string;
 }> = ({ children, delay = 0, duration = 12, className = '' }) => {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
 
   if (!mounted) return <div className={className}>{children}</div>;
 

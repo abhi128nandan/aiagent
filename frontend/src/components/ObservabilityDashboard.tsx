@@ -21,9 +21,13 @@ import {
 import { useAgentStore } from '../store/agentStore';
 import { api, getBackendBaseUrl } from '../api/backend';
 
+const EMPTY_LOGS: any[] = [];
+
 export const ObservabilityDashboard: React.FC = () => {
     const { activeSessionId, observabilityLogsBySession, setObservabilityLogs } = useAgentStore();
-    const liveLogs = observabilityLogsBySession[activeSessionId] || [];
+    const liveLogs = useMemo(() => {
+        return observabilityLogsBySession[activeSessionId] || EMPTY_LOGS;
+    }, [observabilityLogsBySession, activeSessionId]);
 
     // Local State
     const [searchQuery, setSearchQuery] = useState('');
@@ -35,7 +39,7 @@ export const ObservabilityDashboard: React.FC = () => {
     const [loading, setLoading] = useState(false);
 
     // Fetch historical logs & summary metrics
-    const fetchLogsAndSummary = async () => {
+    const fetchLogsAndSummary = React.useCallback(async () => {
         if (!activeSessionId) return;
         setLoading(true);
         try {
@@ -50,11 +54,37 @@ export const ObservabilityDashboard: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [activeSessionId, setObservabilityLogs]);
 
     useEffect(() => {
-        fetchLogsAndSummary();
-    }, [activeSessionId]);
+        let isCurrent = true;
+        if (!activeSessionId) return;
+
+        Promise.resolve().then(() => {
+            if (isCurrent) setLoading(true);
+        });
+
+        Promise.all([
+            api.observability.getLogs(activeSessionId),
+            api.observability.getSummary(activeSessionId)
+        ])
+            .then(([logsRes, summaryRes]) => {
+                if (isCurrent) {
+                    setObservabilityLogs(logsRes, activeSessionId);
+                    setSummary(summaryRes);
+                }
+            })
+            .catch((error) => {
+                console.error('Failed to load observability logs/summary:', error);
+            })
+            .finally(() => {
+                if (isCurrent) setLoading(false);
+            });
+
+        return () => {
+            isCurrent = false;
+        };
+    }, [activeSessionId, setObservabilityLogs]);
 
     // Format timestamps nicely
     const formatTime = (tsStr: string) => {

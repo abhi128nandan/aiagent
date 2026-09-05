@@ -9,8 +9,6 @@ interface WorkspaceDashboardProps {
 
 export const WorkspaceDashboard: React.FC<WorkspaceDashboardProps> = ({ onOpenBuilder, onOpenIDE }) => {
   const { sessions, activeSessionId, createNewSession, setActiveSession, filesBySession } = useAgentStore();
-  const files = filesBySession[activeSessionId] || {};
-  const fileCount = Object.keys(files).length;
 
   const handleStartNewProject = () => {
     createNewSession();
@@ -19,7 +17,8 @@ export const WorkspaceDashboard: React.FC<WorkspaceDashboardProps> = ({ onOpenBu
 
   const handleContinueSession = (sessionId: string) => {
     setActiveSession(sessionId);
-    if (fileCount > 0) {
+    const targetFiles = filesBySession[sessionId] || {};
+    if (Object.keys(targetFiles).length > 0) {
       onOpenIDE();
     } else {
       onOpenBuilder();

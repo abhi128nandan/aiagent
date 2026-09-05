@@ -14,6 +14,8 @@ interface UploadResult {
     rag_enabled: boolean;
 }
 
+const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.doc', '.md', '.txt'];
+
 export const FileUpload: React.FC = () => {
     const [isDragging, setIsDragging] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -21,8 +23,6 @@ export const FileUpload: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const { addMessage, setSrsText, activeSessionId } = useAgentStore();
     const { send } = useAgentStream();
-
-    const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.doc', '.md', '.txt'];
 
     const handleFile = useCallback(async (file: File) => {
         const ext = '.' + file.name.split('.').pop()?.toLowerCase();
@@ -39,14 +39,12 @@ export const FileUpload: React.FC = () => {
             const uploadResult = await api.documents.upload(file);
             setResult(uploadResult);
 
-            // Store the full extracted text so the agent can use it
+            // Store full text in agentStore for injection into the next prompt
             setSrsText(uploadResult.full_text, activeSessionId);
 
-            // Inject the document text as a system preview message
             addMessage({
                 role: 'system',
-                content: `📄 Document uploaded: **${uploadResult.filename}**\n` +
-                    `• ${uploadResult.text_length.toLocaleString()} characters extracted\n` +
+                content: `📄 Uploaded SRS: **${uploadResult.filename}** (${Math.round(uploadResult.text_length / 1000)}k chars)\n` +
                     (uploadResult.rag_enabled
                         ? `• ${uploadResult.chunks_indexed} chunks indexed for semantic search\n`
                         : '• RAG indexing not available\n') +
@@ -55,7 +53,7 @@ export const FileUpload: React.FC = () => {
 
             // Automatically trigger the AI Agent to build the app from the uploaded SRS!
             const prompt = `Build the complete application specified in the uploaded SRS document (${uploadResult.filename}). Implement all required features with clean code and modern styling.`;
-            const srsContext = useAgentStore.getState().consumeSrsText(activeSessionId);
+            const srsContext = uploadResult.full_text;
             const fullMessage = srsContext
                 ? `[SRS DOCUMENT]\n${srsContext}\n\n[USER INSTRUCTION]\n${prompt}`
                 : prompt;
@@ -92,7 +90,12 @@ export const FileUpload: React.FC = () => {
     const handleBuildFromSrs = (e: React.MouseEvent) => {
         e.preventDefault();
         if (!result) return;
-        send(`Build the complete application specified in the uploaded SRS document (${result.filename}). Implement all required features, clean UI, and complete application logic.`);
+        const prompt = `Build the complete application specified in the uploaded SRS document (${result.filename}). Implement all required features, clean UI, and complete application logic.`;
+        const srsContext = result.full_text;
+        const fullMessage = srsContext
+            ? `[SRS DOCUMENT]\n${srsContext}\n\n[USER INSTRUCTION]\n${prompt}`
+            : prompt;
+        send(fullMessage);
     };
 
     return (

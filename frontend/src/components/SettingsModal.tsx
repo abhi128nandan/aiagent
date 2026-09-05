@@ -23,7 +23,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     const [newIsDefault, setNewIsDefault] = useState(false);
 
     const loadData = async () => {
-        setLoading(true);
         try {
             const [profilesRes, settingsRes] = await Promise.all([
                 api.settings.profiles.list(),
@@ -39,7 +38,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     };
 
     useEffect(() => {
-        loadData();
+        let isMounted = true;
+        Promise.all([
+            api.settings.profiles.list(),
+            api.settings.getAll(),
+        ])
+            .then(([profilesRes, settingsRes]) => {
+                if (isMounted) {
+                    setProfiles(profilesRes.profiles);
+                    setGeneralSettings(settingsRes.settings);
+                }
+            })
+            .catch((error) => {
+                console.error('Failed to load settings data:', error);
+            })
+            .finally(() => {
+                if (isMounted) {
+                    setLoading(false);
+                }
+            });
+
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     const handleCreateProfile = async (e: React.FormEvent) => {
@@ -103,18 +124,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             setActionLoading(null);
         }
     };
-
-    useEffect(() => {
-        if (newProvider === 'gemini') {
-            setNewModel('gemini/gemini-2.5-flash');
-        } else if (newProvider === 'groq') {
-            setNewModel('groq/llama-3.3-70b-versatile');
-        } else if (newProvider === 'ollama') {
-            setNewModel('ollama/qwen2.5-coder:7b');
-        } else if (newProvider === 'openai') {
-            setNewModel('openai/gpt-4o-mini');
-        }
-    }, [newProvider]);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 font-sans">
@@ -272,7 +281,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                                             <label className="text-text-muted block font-medium">Provider</label>
                                             <select
                                                 value={newProvider}
-                                                onChange={e => setNewProvider(e.target.value)}
+                                                onChange={e => {
+                                                    const prov = e.target.value;
+                                                    setNewProvider(prov);
+                                                    if (prov === 'gemini') setNewModel('gemini/gemini-2.5-flash');
+                                                    else if (prov === 'groq') setNewModel('groq/llama-3.3-70b-versatile');
+                                                    else if (prov === 'ollama') setNewModel('ollama/qwen2.5-coder:7b');
+                                                    else if (prov === 'openai') setNewModel('openai/gpt-4o-mini');
+                                                }}
                                                 className="w-full bg-surface border border-border rounded-lg px-3 py-1.5 text-text focus:border-brand outline-none"
                                             >
                                                 <option value="gemini">Gemini</option>

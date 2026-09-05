@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useAgentStore } from '../store/agentStore';
+import { useAgentStore, type Message } from '../store/agentStore';
 import { Send, Terminal, Loader2, Square, Play, FileText, PlayCircle, Search, CheckCircle2, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { useAgentStream } from '../hooks/useAgentStream';
 import { FileUpload } from './FileUpload';
@@ -88,11 +88,37 @@ const parseMessageContent = (text: string) => {
     }
     
     if (lastIndex < text.length) {
-        parts.push({ type: 'text', content: text.substring(lastIndex) });
+        const remaining = text.substring(lastIndex);
+        const unclosedWrite = remaining.match(/^(.*?)<write\s+path=['"]([^'"]+)['"]>([\s\S]*)$/);
+        const unclosedThink = remaining.match(/^(.*?)<think>([\s\S]*)$/);
+        const unclosedRun = remaining.match(/^(.*?)<run>([\s\S]*)$/);
+        const unclosedSearch = remaining.match(/^(.*?)<search>([\s\S]*)$/);
+        const unclosedFinish = remaining.match(/^(.*?)<finish>([\s\S]*)$/);
+
+        if (unclosedWrite) {
+            if (unclosedWrite[1]) parts.push({ type: 'text', content: unclosedWrite[1] });
+            parts.push({ type: 'write', path: unclosedWrite[2], content: unclosedWrite[3] });
+        } else if (unclosedThink) {
+            if (unclosedThink[1]) parts.push({ type: 'text', content: unclosedThink[1] });
+            parts.push({ type: 'think', content: unclosedThink[2] });
+        } else if (unclosedRun) {
+            if (unclosedRun[1]) parts.push({ type: 'text', content: unclosedRun[1] });
+            parts.push({ type: 'run', content: unclosedRun[2] });
+        } else if (unclosedSearch) {
+            if (unclosedSearch[1]) parts.push({ type: 'text', content: unclosedSearch[1] });
+            parts.push({ type: 'search', content: unclosedSearch[2] });
+        } else if (unclosedFinish) {
+            if (unclosedFinish[1]) parts.push({ type: 'text', content: unclosedFinish[1] });
+            parts.push({ type: 'finish', content: unclosedFinish[2] });
+        } else {
+            parts.push({ type: 'text', content: remaining });
+        }
     }
     
     return parts;
 };
+
+const EMPTY_MESSAGES: Message[] = [];
 
 interface ChatProps {
     initialPrompt?: string;
@@ -114,7 +140,7 @@ export const Chat: React.FC<ChatProps> = ({ initialPrompt = '', onPromptSent }) 
     const { send, resume, stop } = useAgentStream();
     const [input, setInput] = useState(initialPrompt);
     const endRef = useRef<HTMLDivElement>(null);
-    const messages = messagesBySession[activeSessionId] || [];
+    const messages = messagesBySession[activeSessionId] || EMPTY_MESSAGES;
     const pending = pendingBySession[activeSessionId] || [];
 
     const isRunning = connectionState === 'open' && status !== 'idle' && status !== 'error';
